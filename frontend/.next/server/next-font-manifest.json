@@ -1,0 +1,16 @@
+{
+  "app": {
+    "[project]/frontend/app/(landing)/page": [
+      "static/media/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yygg_vb-s.p.20b09c80.woff2"
+    ],
+    "[project]/frontend/app/(auth)/auth/login/page": [
+      "static/media/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yygg_vb-s.p.20b09c80.woff2"
+    ],
+    "[project]/frontend/app/(landing)/deposit/page": [
+      "static/media/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yygg_vb-s.p.20b09c80.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

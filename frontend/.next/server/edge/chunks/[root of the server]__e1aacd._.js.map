@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 23, "column": 0}, "map": {"version":3,"sources":["turbopack://[project]/frontend/middleware.ts"],"sourcesContent":["import { NextRequest, NextResponse } from 'next/server'\r\n\r\nconst PRIVATE = ['/dashboard', '/wagers', '/profile', '/settings', '/challenges']\r\n\r\nexport function middleware(req: NextRequest) {\r\n  const { pathname } = req.nextUrl\r\n\r\n  if (PRIVATE.some((r) => pathname.startsWith(r)) && !req.cookies.has('auth_token')) {\r\n    return NextResponse.redirect(new URL('/auth/login', req.url))\r\n  }\r\n\r\n  return NextResponse.next()\r\n}\r\n\r\nexport const config = {\r\n  matcher: ['/((?!.+\\\\.[\\\\w]+$|_next).*)'],\r\n}\r\n"],"names":[],"mappings":";;;;AAAA;AAAA;;AAEA,MAAM,UAAU;IAAC;IAAc;IAAW;IAAY;IAAa;CAAc;AAE1E,SAAS,WAAW,GAAgB;IACzC,MAAM,EAAE,QAAQ,EAAE,GAAG,IAAI,OAAO;IAEhC,IAAI,QAAQ,IAAI,CAAC,CAAC,IAAM,SAAS,UAAU,CAAC,OAAO,CAAC,IAAI,OAAO,CAAC,GAAG,CAAC,eAAe;QACjF,OAAO,qTAAA,CAAA,eAAY,CAAC,QAAQ,CAAC,IAAI,IAAI,eAAe,IAAI,GAAG;IAC7D;IAEA,OAAO,qTAAA,CAAA,eAAY,CAAC,IAAI;AAC1B;AAEO,MAAM,SAAS;IACpB,SAAS;QAAC;KAA8B;AAC1C"}},
+    {"offset": {"line": 49, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}}]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "challengers-bet",
+  "version": "0.1.0",
+  "private": true,
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
+  }
+}
