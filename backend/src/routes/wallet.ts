@@ -109,6 +109,22 @@ router.post('/deposits', authenticate, async (req: Request, res: Response, next:
 // TRC20 addresses: base58, start with T, 34 chars total.
 const TRC20_ADDRESS_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/
 
+// GET /wallet/limits — single source of truth for amount limits. Public so the unauthenticated
+// landing page can render the right "min stake" copy. Mirrors env values; client reads on mount.
+router.get('/limits', (_req: Request, res: Response) => {
+  res.json({
+    data: {
+      currency: 'USDT',
+      minStake: env.MIN_STAKE,
+      maxStake: env.MAX_STAKE,
+      minDeposit: env.MIN_DEPOSIT,
+      minWithdrawal: env.MIN_WITHDRAWAL,
+      withdrawalReviewThreshold: env.WITHDRAWAL_REVIEW_THRESHOLD,
+      platformFeePercent: env.PLATFORM_FEE_PERCENT,
+    },
+  })
+})
+
 router.get('/withdrawals', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userObjectId = new Types.ObjectId(req.user!.id)

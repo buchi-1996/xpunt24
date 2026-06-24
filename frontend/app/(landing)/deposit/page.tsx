@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '@/lib/apiClient'
 import { useWallet } from '@/context/wallet/WalletContect'
 import { useAuth } from '@/context/auth/AuthContext'
+import { useLimits } from '@/context/limits/LimitsContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CheckCircle2Icon, ClipboardCopyIcon, RefreshCwIcon, AlertCircleIcon } from 'lucide-react'
@@ -22,11 +23,10 @@ interface DepositIntent {
 
 type DepositStatus = 'INITIATED' | 'PENDING_CONFIRMATION' | 'CONFIRMED' | 'CREDITED' | 'FAILED' | 'EXPIRED'
 
-const MIN_DEPOSIT = 10
-
 export default function DepositPage() {
   const { user } = useAuth()
   const { refresh: refreshWallet } = useWallet()
+  const { minDeposit } = useLimits()
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [intent, setIntent] = useState<DepositIntent | null>(null)
@@ -80,8 +80,8 @@ export default function DepositPage() {
   async function handleCreateDeposit(e: React.FormEvent) {
     e.preventDefault()
     const parsed = parseFloat(amount)
-    if (!parsed || parsed < MIN_DEPOSIT) {
-      toast.error(`Minimum deposit is ${MIN_DEPOSIT} USDT`)
+    if (!parsed || parsed < minDeposit) {
+      toast.error(`Minimum deposit is ${minDeposit} USDT`)
       return
     }
 
@@ -143,16 +143,16 @@ export default function DepositPage() {
                 <div className="relative">
                   <Input
                     type="number"
-                    min={MIN_DEPOSIT}
+                    min={minDeposit}
                     step="0.01"
-                    placeholder={`Min. ${MIN_DEPOSIT} USDT`}
+                    placeholder={`Min. ${minDeposit} USDT`}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="py-6 rounded-lg shadow-none pr-16"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">USDT</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Minimum deposit: {MIN_DEPOSIT} USDT</p>
+                <p className="text-xs text-gray-400 mt-1">Minimum deposit: {minDeposit} USDT</p>
               </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700 space-y-1">

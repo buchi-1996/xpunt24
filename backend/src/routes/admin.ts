@@ -8,8 +8,10 @@ import { walletService } from '../services/wallet.service'
 import { socketService } from '../services/socket.service'
 import { notificationService } from '../services/notification.service'
 import { AdminAction } from '../db/models/admin-action.model'
+import { User } from '../db/models/user.model'
 import { Withdrawal } from '../db/models/withdrawal.model'
 import { SettlementOutcome } from '../db/models/settlement.model'
+import { payRamAdapter } from '../gateways/payram.adapter'
 import { AppError } from '../utils/AppError'
 import { SocketEvent } from '@challengers-bet/shared'
 
@@ -37,6 +39,95 @@ router.post(
       await settlementService.settleChallenge(challengeId, outcome, 'ADMIN', adminId)
 
       res.json({ success: true })
+    } catch (err) {
+      next(err)
+    }
+  },
+)
+
+// POST /admin/withdrawals/:id/approve
+// Admin approves an UNDER_REVIEW withdrawal — debits the wallet (it wasn't debited at submission)
+// and submits the payout to PayRam. If the gateway rejects, refund and mark FAILED.
+router.post(
+  '/withdrawals/:id/approve',
+  authenticate,
+  requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { notes } = req.body as { notes?: string }
+      const withdrawalId = String(req.params['id'])
+      const adminId = req.user!.id
+
+      const withdrawal = await Withdrawal.findById(withdrawalId)
+      if (!withdrawal) throw new AppError('Withdrawal not found', 404)
+      if (withdrawal.status !== 'UNDER_REVIEW') {
+        throw new AppError(
+          `Only UNDER_REVIEW withdrawals can be approved (current: ${withdrawal.status})`,
+          400,
+          'NOT_UNDER_REVIEW',
+        )
+      }
+
+      const userId = withdrawal.userId.toString()
+      const amount = parseFloat(withdrawal.amount.toString())
+
+      await AdminAction.create({
+        adminUserId: new Types.ObjectId(adminId),
+        action: 'APPROVE_WITHDRAWAL',
+        targetModel: 'Withdrawal',
+        targetId: withdrawalId,
+        reason: notes,
+        ipAddress: req.ip,
+      })
+
+      // Debit the wallet now (UNDER_REVIEW rows weren't debited at submission)
+      await walletService.debitWithdrawal(userId, amount, withdrawalId)
+
+      // Submit to PayRam — same refund-on-failure dance as the user flow
+      try {
+        const user = await User.findById(userId).select('email').lean()
+        if (!user?.email) throw new AppError('User email required for payout', 400)
+
+        const payout = await payRamAdapter.createPayout({
+          amount: String(amount),
+          customerEmail: user.email,
+          customerID: userId,
+          toAddress: withdrawal.destinationAddress,
+          blockchainCode: 'TRX',
+          currencyCode: 'USDT',
+        })
+
+        withdrawal.providerReference = String(payout.id)
+        withdrawal.status = 'PROCESSING'
+        withdrawal.reviewedBy = new Types.ObjectId(adminId)
+        withdrawal.reviewedAt = new Date()
+        await withdrawal.save()
+      } catch (err) {
+        await walletService.refundWithdrawal(userId, amount, withdrawalId)
+        withdrawal.status = 'FAILED'
+        withdrawal.rejectionReason = err instanceof Error ? err.message : 'Gateway error'
+        withdrawal.reviewedBy = new Types.ObjectId(adminId)
+        withdrawal.reviewedAt = new Date()
+        await withdrawal.save()
+        socketService.emitToUser(userId, SocketEvent.WALLET_BALANCE_UPDATED, { userId })
+        throw err
+      }
+
+      socketService.emitToUser(userId, SocketEvent.WITHDRAWAL_PROCESSED, {
+        withdrawalId,
+        status: 'PROCESSING',
+      })
+      socketService.emitToUser(userId, SocketEvent.WALLET_BALANCE_UPDATED, { userId })
+
+      await notificationService.create(
+        userId,
+        'WITHDRAWAL_PROCESSED',
+        'Withdrawal Approved',
+        `Your withdrawal of ${amount} ${withdrawal.currency} has been approved and is being processed.`,
+        { withdrawalId },
+      )
+
+      res.json({ success: true, data: { withdrawalId, status: withdrawal.status } })
     } catch (err) {
       next(err)
     }

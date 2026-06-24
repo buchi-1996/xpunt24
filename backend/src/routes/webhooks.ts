@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express'
 import { Deposit } from '../db/models/deposit.model'
 import { Withdrawal } from '../db/models/withdrawal.model'
 import { walletService } from '../services/wallet.service'
+import { withdrawalService } from '../services/withdrawal.service'
 import { socketService } from '../services/socket.service'
 import { notificationService } from '../services/notification.service'
 import {
@@ -133,73 +134,12 @@ router.post('/payout/payram', async (req: Request, res: Response, next: NextFunc
       return
     }
 
-    // Idempotency — terminal states never re-process
-    if (['COMPLETED', 'REJECTED', 'FAILED'].includes(withdrawal.status)) {
-      res.json({ received: true })
-      return
-    }
-
-    const userId = withdrawal.userId.toString()
-    const status = (payload.status ?? '').toLowerCase()
-    const event = payload.event_type.toLowerCase()
-
-    // Terminal success — funds confirmed on chain
-    if (event === 'payout.sent' || event === 'payout.processed' || status === 'sent' || status === 'processed') {
-      withdrawal.status = 'COMPLETED'
-      if (payload.tx_hash) withdrawal.txHash = payload.tx_hash
-      withdrawal.processedAt = new Date()
-      await withdrawal.save()
-
-      socketService.emitToUser(userId, SocketEvent.WITHDRAWAL_PROCESSED, {
-        withdrawalId: withdrawal._id.toString(),
-        status: 'COMPLETED',
-        txHash: payload.tx_hash,
-      })
-
-      await notificationService.create(
-        userId,
-        'WITHDRAWAL_PROCESSED',
-        'Withdrawal Sent',
-        `Your withdrawal of ${withdrawal.amount.toString()} ${withdrawal.currency} has been sent on-chain.`,
-        { withdrawalId: withdrawal._id.toString(), txHash: payload.tx_hash },
-      )
-    }
-    // Terminal failure — refund user and mark failed/rejected
-    else if (
-      event === 'payout.failed' ||
-      event === 'payout.rejected' ||
-      event === 'payout.cancelled' ||
-      ['failed', 'rejected', 'cancelled'].includes(status)
-    ) {
-      const amountNum = parseFloat(withdrawal.amount.toString())
-      try {
-        await walletService.refundWithdrawal(userId, amountNum, withdrawal._id.toString())
-      } catch (refundErr) {
-        console.error(`Failed to refund withdrawal ${withdrawal._id}:`, refundErr)
-      }
-      withdrawal.status = status === 'rejected' ? 'REJECTED' : 'FAILED'
-      withdrawal.rejectionReason = payload.failure_reason || event
-      await withdrawal.save()
-
-      socketService.emitToUser(userId, SocketEvent.WITHDRAWAL_PROCESSED, {
-        withdrawalId: withdrawal._id.toString(),
-        status: withdrawal.status,
-      })
-      socketService.emitToUser(userId, SocketEvent.WALLET_BALANCE_UPDATED, { userId })
-
-      await notificationService.create(
-        userId,
-        'WITHDRAWAL_REJECTED',
-        'Withdrawal Failed',
-        `Your withdrawal of ${withdrawal.amount.toString()} ${withdrawal.currency} could not be processed — funds have been refunded.`,
-        { withdrawalId: withdrawal._id.toString(), reason: withdrawal.rejectionReason },
-      )
-    }
-    // Intermediate states — bump status to PROCESSING if we're still in flight
-    else if (withdrawal.status === 'PENDING' || withdrawal.status === 'UNDER_REVIEW') {
-      withdrawal.status = 'PROCESSING'
-      await withdrawal.save()
-    }
+    await withdrawalService.applyPayoutStatus(
+      withdrawal,
+      payload.event_type || payload.status,
+      payload.tx_hash,
+      payload.failure_reason,
+    )
 
     res.json({ received: true })
   } catch (err) {

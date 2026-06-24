@@ -9,7 +9,7 @@ import { useModal } from '@/hooks/useModal'
 import LoaderSpinner from '../spinner'
 import { useWallet } from '@/context/wallet/WalletContect'
 import { api } from '@/lib/apiClient'
-import { MIN_STAKE } from '@/lib/constants'
+import { useLimits } from '@/context/limits/LimitsContext'
 import { Match } from '@/types'
 
 type ChallengeProps = {
@@ -19,6 +19,7 @@ type ChallengeProps = {
 
 const Challenge = ({ match, selectedOption }: ChallengeProps) => {
   const { refresh: refreshWallet } = useWallet()
+  const { minStake } = useLimits()
   const [input, setInput] = useState<string>('')
   const [potentialWin, setPotentialWin] = useState<number>(0)
   const { setIsOpen } = useModal()
@@ -34,8 +35,8 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
   }
 
   const handleCreateChallenge = () => {
-    if (!input || Number(input) < MIN_STAKE) {
-      toast.error(`Please enter a valid amount (minimum ${MIN_STAKE} USDT)`)
+    if (!input || Number(input) < minStake) {
+      toast.error(`Please enter a valid amount (minimum ${minStake} USDT)`)
       return
     }
     if (!selectedOption) {
@@ -110,7 +111,7 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
           />
         </div>
         <small className="text-xs text-gray-600">
-          Min stake <span className="font-bold">{MIN_STAKE} USDT</span>
+          Min stake <span className="font-bold">{minStake} USDT</span>
         </small>
         <div className="flex items-center justify-between my-6 border-t border-b py-2">
           <h4 className="font-bold text-gray-600">Potential win:</h4>

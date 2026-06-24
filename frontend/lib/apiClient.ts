@@ -47,6 +47,7 @@ export const api = {
   },
 
   wallet: {
+    limits: () => get<{ data: PlatformLimits }>('/wallet/limits'),
     balance: () => get<{ data: { balance: string; lockedBalance: string; currency: string } }>('/wallet/balance'),
     transactions: (page?: number) =>
       get<{ data: unknown[]; total: number; page: number; totalPages: number }>(
@@ -133,6 +134,16 @@ export const api = {
     markRead: (id: string) => patch<{ data: NotificationItem }>(`/notifications/${id}/read`),
     markAllRead: () => patch<{ success: boolean }>('/notifications/read-all'),
   },
+}
+
+export interface PlatformLimits {
+  currency: string
+  minStake: number
+  maxStake: number
+  minDeposit: number
+  minWithdrawal: number
+  withdrawalReviewThreshold: number
+  platformFeePercent: number
 }
 
 export interface NotificationItem {

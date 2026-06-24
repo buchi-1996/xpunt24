@@ -16,9 +16,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api, WithdrawalItem, WithdrawalStatus } from '@/lib/apiClient'
-import { MIN_WITHDRAWAL, WITHDRAWAL_REVIEW_THRESHOLD } from '@/lib/constants'
 import { useAuth } from '@/context/auth/AuthContext'
 import { useWallet } from '@/context/wallet/WalletContect'
+import { useLimits } from '@/context/limits/LimitsContext'
 import { cn } from '@/lib/utils'
 
 const TRC20_ADDRESS_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/
@@ -81,6 +81,7 @@ const safeRelativeTime = (iso: string | undefined | null): string => {
 export default function WithdrawPage() {
   const { user } = useAuth()
   const { balance, lockedBalance, currency, refresh: refreshWallet, isRefreshing } = useWallet()
+  const { minWithdrawal, withdrawalReviewThreshold } = useLimits()
 
   const [amount, setAmount] = useState('')
   const [address, setAddress] = useState('')
@@ -118,8 +119,8 @@ export default function WithdrawPage() {
       toast.error('Enter a valid amount')
       return
     }
-    if (parsed < MIN_WITHDRAWAL) {
-      toast.error(`Minimum withdrawal is ${MIN_WITHDRAWAL} USDT`)
+    if (parsed < minWithdrawal) {
+      toast.error(`Minimum withdrawal is ${minWithdrawal} USDT`)
       return
     }
     if (parsed > available) {
@@ -172,7 +173,7 @@ export default function WithdrawPage() {
   }
 
   const parsedAmount = parseFloat(amount || '0')
-  const willReview = parsedAmount >= WITHDRAWAL_REVIEW_THRESHOLD
+  const willReview = parsedAmount >= withdrawalReviewThreshold
 
   return (
     <section className="py-10">
@@ -229,9 +230,9 @@ export default function WithdrawPage() {
               <div className="relative">
                 <Input
                   type="number"
-                  min={MIN_WITHDRAWAL}
+                  min={minWithdrawal}
                   step="0.01"
-                  placeholder={`Min. ${MIN_WITHDRAWAL} USDT`}
+                  placeholder={`Min. ${minWithdrawal} USDT`}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="py-6 rounded-lg shadow-none pr-16"
@@ -241,7 +242,7 @@ export default function WithdrawPage() {
                   USDT
                 </span>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Minimum withdrawal: {MIN_WITHDRAWAL} USDT</p>
+              <p className="text-xs text-gray-400 mt-1">Minimum withdrawal: {minWithdrawal} USDT</p>
             </div>
 
             <div>
@@ -265,7 +266,7 @@ export default function WithdrawPage() {
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700 flex gap-2">
                 <ShieldAlertIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <p>
-                  Withdrawals of <strong>{WITHDRAWAL_REVIEW_THRESHOLD} USDT</strong> or more are held for
+                  Withdrawals of <strong>{withdrawalReviewThreshold} USDT</strong> or more are held for
                   manual review and may take up to 24 hours to process.
                 </p>
               </div>
