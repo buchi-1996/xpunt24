@@ -5,6 +5,7 @@ import LeagueTabs from '@/components/leagueTabs'
 import Challenge from '@/components/negociation/Challenge'
 import { Button } from '@/components/ui/button'
 import { useModal } from '@/hooks/useModal'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { formatFixtureDateTime } from '@/lib/utils'
 import { Match } from '@/types'
 import { ArrowLeft } from 'lucide-react'
@@ -18,6 +19,7 @@ type OddsTableProps = {
 const MatchMarkets = ({ match }: OddsTableProps) => {
 
     const { openModal } = useModal();
+    const requireAuth = useRequireAuth();
     const { fixture, teams } = match;
     const { home, away } = teams;
     const { timestamp } = fixture;
@@ -25,8 +27,9 @@ const MatchMarkets = ({ match }: OddsTableProps) => {
 
 
     const handleOptionClick = (option: string) => {
-        openModal(
-            <Challenge match={match} selectedOption={option} />
+        requireAuth(
+            () => openModal(<Challenge match={match} selectedOption={option} />),
+            'Log in to place a wager',
         );
     };
 

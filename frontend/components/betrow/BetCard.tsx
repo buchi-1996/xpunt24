@@ -4,6 +4,7 @@ import React from 'react'
 import { Button } from '../ui/button'
 import Oppose from '../negociation/Oppose'
 import { useModal } from '@/hooks/useModal'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { format } from 'date-fns'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 
@@ -51,6 +52,7 @@ function isValidMatchData(data: unknown): data is ExpectedMatchData {
 
 const BetCard = ({ _id, matchData, amount, challenger, challengerPick, opposerPick }: BetCardProps) => {
   const { openModal } = useModal()
+  const requireAuth = useRequireAuth()
   const challengerName = challenger?.name ?? challenger?.username ?? 'Anonymous'
   const challengerImage = challenger?.image ?? ''
   const avatarFallback =
@@ -112,7 +114,12 @@ const BetCard = ({ _id, matchData, amount, challenger, challengerPick, opposerPi
         </div>
       </div>
       <Button
-        onClick={() => openModal(<Oppose id={_id} match={matchData} amount={amount} opposerPick={opposerPick} />)}
+        onClick={() =>
+          requireAuth(
+            () => openModal(<Oppose id={_id} match={matchData} amount={amount} opposerPick={opposerPick} />),
+            'Log in to oppose this challenge',
+          )
+        }
         variant="secondary"
         className="w-full"
       >

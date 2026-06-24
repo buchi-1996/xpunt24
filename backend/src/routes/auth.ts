@@ -28,14 +28,31 @@ function issueToken(userId: string, role: UserRole, accountStatus: AccountStatus
 }
 
 // GET /auth/google — redirect to Google consent page
-router.get('/google', (_req: Request, res: Response) => {
+// Optional ?redirect=/some/path is round-tripped through Google's `state` param so the callback
+// can return the user to the page they were on before authenticating.
+router.get('/google', (req: Request, res: Response) => {
+  const redirect = typeof req.query['redirect'] === 'string' ? req.query['redirect'] : undefined
+  const state = redirect ? Buffer.from(redirect, 'utf8').toString('base64url') : undefined
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: ['openid', 'email', 'profile'],
     prompt: 'select_account',
+    ...(state ? { state } : {}),
   })
   res.redirect(url)
 })
+
+// Only allow internal, relative paths so we can't be turned into an open redirect.
+function safeRedirectPath(state: string | undefined): string {
+  if (!state) return '/'
+  try {
+    const decoded = Buffer.from(state, 'base64url').toString('utf8')
+    if (decoded.startsWith('/') && !decoded.startsWith('//')) return decoded
+  } catch {
+    /* fall through */
+  }
+  return '/'
+}
 
 // GET /auth/callback/google — exchange code, find/create user, issue JWT
 router.get(
@@ -107,9 +124,10 @@ router.get(
         maxAge: COOKIE_MAX_AGE_MS,
       })
 
-      // Redirect to the web app after successful login
+      // Redirect to the web app after successful login, honoring any signed-in-from state.
       const origin = env.ALLOWED_ORIGINS.split(',')[0] ?? 'http://localhost:3000'
-      res.redirect(origin)
+      const state = typeof req.query['state'] === 'string' ? req.query['state'] : undefined
+      res.redirect(`${origin}${safeRedirectPath(state)}`)
     } catch (err) {
       next(err)
     }

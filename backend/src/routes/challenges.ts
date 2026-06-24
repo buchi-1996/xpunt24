@@ -5,7 +5,8 @@ import { Market, Pick, ChallengeVisibility } from '@challengers-bet/shared'
 
 const router = Router()
 
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+// Public — visitors can browse the open challenge lobby. Auth is enforced at create/accept.
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await challengeService.listChallenges(req.query as Record<string, unknown>)
     res.json(result)

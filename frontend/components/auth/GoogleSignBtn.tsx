@@ -2,10 +2,13 @@
 
 import Image from 'next/image'
 
-const GoogleSignBtn = ({ text }: { text: string }) => {
+const GoogleSignBtn = ({ text, redirect }: { text: string; redirect?: string }) => {
   const handleClick = () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
-    window.location.href = `${apiUrl}/auth/google`
+    const url = redirect
+      ? `${apiUrl}/auth/google?redirect=${encodeURIComponent(redirect)}`
+      : `${apiUrl}/auth/google`
+    window.location.href = url
   }
 
   return (

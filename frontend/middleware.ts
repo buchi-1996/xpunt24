@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PRIVATE = ['/dashboard', '/wagers', '/profile', '/settings', '/challenges']
+// /challenges is intentionally NOT in this list — the lobby is public so visitors can browse
+// open challenges. Authentication is enforced per-action (create / accept / cancel) at the API
+// layer and via useRequireAuth() on the buttons that trigger those actions.
+const PRIVATE = ['/dashboard', '/wagers', '/profile', '/settings']
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl

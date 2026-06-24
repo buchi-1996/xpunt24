@@ -1,12 +1,16 @@
 'use client'
 
-import React from 'react'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import FormCard from '../formcard'
 import GoogleSignBtn from '../GoogleSignBtn'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-const LoginForm = () => {
+const LoginFormInner = () => {
+  const params = useSearchParams()
+  const redirect = params.get('redirect') ?? undefined
+
   return (
     <FormCard
       className="w-full shadow-xl max-w-[500px] border-0 flex flex-col items-center justify-center"
@@ -16,7 +20,7 @@ const LoginForm = () => {
       backButtonLabel="Don't have an account? Register"
       isLogin={true}
     >
-      <GoogleSignBtn text="Sign In" />
+      <GoogleSignBtn text="Sign In" redirect={redirect} />
       <div className="flex items-center gap-4 my-6">
         <span className="border-b w-full" />
         <small>Or</small>
@@ -30,5 +34,11 @@ const LoginForm = () => {
     </FormCard>
   )
 }
+
+const LoginForm = () => (
+  <Suspense fallback={null}>
+    <LoginFormInner />
+  </Suspense>
+)
 
 export default LoginForm
