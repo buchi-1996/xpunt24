@@ -109,11 +109,21 @@ class ChallengeService {
 
     // Validate fixture hasn't started
     const fixture = (await fixtureService.getFixtureById(fixtureId)) as {
-      fixture: { status: { short: string }; date: string }
+      fixture: { status: { short: string }; date: string; timestamp?: number }
     }
     const fixtureStatus = fixture?.fixture?.status?.short ?? ''
     const started = ['1H', '2H', 'HT', 'ET', 'P', 'BT', 'FT', 'AET', 'PEN'].includes(fixtureStatus)
     if (started) throw new AppError('Fixture has already started', 400, 'FIXTURE_STARTED')
+
+    // An unmatched challenge auto-expires at kickoff so we don't leave stale OPEN rows holding stake.
+    // If the user passed an explicit expiresAt, use the earlier of the two.
+    const kickoffMs = fixture?.fixture?.timestamp ? fixture.fixture.timestamp * 1000 : undefined
+    const kickoffDate = kickoffMs ? new Date(kickoffMs) : undefined
+    const providedExpiry = expiresAt ? new Date(expiresAt) : undefined
+    const effectiveExpiry: Date | undefined =
+      providedExpiry && kickoffDate
+        ? new Date(Math.min(providedExpiry.getTime(), kickoffDate.getTime()))
+        : (providedExpiry ?? kickoffDate)
 
     const stakeNum = parseFloat(String(stake))
     if (stakeNum < env.MIN_STAKE) {
@@ -170,7 +180,7 @@ class ChallengeService {
         platformFee: toDecimal(platformFee, 'platformFee'),
         status: ChallengeStatus.OPEN,
         visibility: visibility ?? ChallengeVisibility.PUBLIC,
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+        expiresAt: effectiveExpiry,
       })
       await challenge.save({ session })
     })
