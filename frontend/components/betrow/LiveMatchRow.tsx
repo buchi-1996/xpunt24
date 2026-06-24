@@ -3,11 +3,9 @@
 import Link from 'next/link'
 import { Match } from '@/types'
 
-const STATUS_LABELS: Record<string, string> = {
-  '1H': '1H',
-  '2H': '2H',
+// Statuses where no in-play minute is meaningful — fall back to the label instead of the timer.
+const NON_TIMED_LABELS: Record<string, string> = {
   HT: 'HT',
-  ET: 'ET',
   BT: 'BREAK',
   P: 'PEN',
 }
@@ -18,10 +16,8 @@ const LiveMatchRow = ({ match }: { match: Match }) => {
   const homeGoals = match.goals?.home ?? 0
   const awayGoals = match.goals?.away ?? 0
 
-  const label =
-    status === 'HT'
-      ? 'HT'
-      : `${STATUS_LABELS[status] ?? 'LIVE'}${elapsed ? ` ${elapsed}'` : ''}`
+  // Option A: a pulsing red dot + just the minute. The half is implied by the number.
+  const label = NON_TIMED_LABELS[status] ?? (elapsed ? `${elapsed}'` : 'LIVE')
 
   return (
     <Link href={`/matches/${match.fixture.id}`} className="block">
