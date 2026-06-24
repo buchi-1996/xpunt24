@@ -90,12 +90,14 @@ class PayRamAdapter {
     }
   }
 
-  // PayRam signs webhooks with HMAC-SHA256(rawBody, apiKey), sent in X-Payram-Signature (hex)
+  // PayRam signs webhooks with HMAC-SHA256(rawBody, apiKey), sent in
+  // X-Payram-Signature as "sha256=<hex>". Strip the algorithm prefix before comparing.
   verifyWebhookSignature(rawBody: Buffer, signature: string | undefined): boolean {
     if (!signature || !rawBody) return false
+    const provided = signature.startsWith('sha256=') ? signature.slice('sha256='.length) : signature
     const expected = crypto.createHmac('sha256', this.apiKey).update(rawBody).digest('hex')
     const a = Buffer.from(expected, 'hex')
-    const b = Buffer.from(signature, 'hex')
+    const b = Buffer.from(provided, 'hex')
     if (a.length !== b.length || a.length === 0) return false
     return crypto.timingSafeEqual(a, b)
   }
