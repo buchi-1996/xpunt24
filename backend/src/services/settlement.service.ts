@@ -178,13 +178,46 @@ class SettlementService {
 
   async expireOpenChallenges() {
     const now = new Date()
-    const expiredChallenges = await Challenge.find({
+
+    // Direct hits: explicit expiresAt has passed.
+    const expiredByTime = await Challenge.find({
       status: ChallengeStatus.OPEN,
       expiresAt: { $lte: now },
     })
 
+    // Safety net: OPEN challenges with no expiresAt (legacy rows or any creation-time bug
+    // where the kickoff couldn't be resolved). Cross-check each against the live fixture state.
+    const orphans = await Challenge.find({
+      status: ChallengeStatus.OPEN,
+      $or: [{ expiresAt: null }, { expiresAt: { $exists: false } }],
+    })
+
+    const seen = new Set<string>(expiredByTime.map((c) => c._id.toString()))
+    const candidates = [...expiredByTime]
+    for (const orphan of orphans) {
+      if (seen.has(orphan._id.toString())) continue
+      try {
+        const fixture = (await fixtureService.getFixtureById(orphan.fixtureId)) as {
+          fixture: { status: { short: string }; timestamp?: number }
+        }
+        const status = fixture?.fixture?.status?.short ?? ''
+        const startedOrFinished = [
+          '1H', '2H', 'HT', 'ET', 'P', 'BT', 'FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', 'AWD', 'WO',
+        ].includes(status)
+        const kickoffMs = fixture?.fixture?.timestamp ? fixture.fixture.timestamp * 1000 : 0
+        const kickoffPassed = kickoffMs > 0 && kickoffMs <= now.getTime()
+        if (startedOrFinished || kickoffPassed) {
+          candidates.push(orphan)
+          seen.add(orphan._id.toString())
+        }
+      } catch (err) {
+        // Fixture lookup failed — leave the orphan for next sweep rather than expire blindly.
+        console.error(`expireOpenChallenges: fixture lookup failed for ${orphan._id}:`, err)
+      }
+    }
+
     let expired = 0
-    for (const challenge of expiredChallenges) {
+    for (const challenge of candidates) {
       try {
         const stakeNum = parseFloat(challenge.stake.toString())
         const session = await mongoose.startSession()
@@ -197,7 +230,7 @@ class SettlementService {
           )
           await Challenge.findByIdAndUpdate(
             challenge._id,
-            { status: ChallengeStatus.EXPIRED },
+            { status: ChallengeStatus.EXPIRED, expiresAt: challenge.expiresAt ?? now },
             { session },
           )
           await Wager.updateMany(
@@ -223,7 +256,7 @@ class SettlementService {
       }
     }
 
-    return { processed: expiredChallenges.length, expired }
+    return { processed: candidates.length, expired }
   }
 
   private async updateUserStats(userId: string, won: boolean) {

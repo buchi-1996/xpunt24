@@ -115,15 +115,24 @@ class ChallengeService {
     const started = ['1H', '2H', 'HT', 'ET', 'P', 'BT', 'FT', 'AET', 'PEN'].includes(fixtureStatus)
     if (started) throw new AppError('Fixture has already started', 400, 'FIXTURE_STARTED')
 
-    // An unmatched challenge auto-expires at kickoff so we don't leave stale OPEN rows holding stake.
-    // If the user passed an explicit expiresAt, use the earlier of the two.
+    // Refuse to create a challenge we can't auto-expire. A null kickoff timestamp would silently
+    // produce a null expiresAt and leave the OPEN row holding stake forever.
     const kickoffMs = fixture?.fixture?.timestamp ? fixture.fixture.timestamp * 1000 : undefined
-    const kickoffDate = kickoffMs ? new Date(kickoffMs) : undefined
+    if (!kickoffMs) {
+      throw new AppError(
+        'Could not determine fixture kickoff time — please try again',
+        502,
+        'FIXTURE_KICKOFF_UNKNOWN',
+      )
+    }
+    const kickoffDate = new Date(kickoffMs)
+
+    // expiresAt = min(provided, kickoff). Always set — never null.
     const providedExpiry = expiresAt ? new Date(expiresAt) : undefined
-    const effectiveExpiry: Date | undefined =
-      providedExpiry && kickoffDate
-        ? new Date(Math.min(providedExpiry.getTime(), kickoffDate.getTime()))
-        : (providedExpiry ?? kickoffDate)
+    const effectiveExpiry: Date =
+      providedExpiry && providedExpiry.getTime() < kickoffDate.getTime()
+        ? providedExpiry
+        : kickoffDate
 
     const stakeNum = parseFloat(String(stake))
     if (stakeNum < env.MIN_STAKE) {
