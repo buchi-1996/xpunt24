@@ -2,6 +2,11 @@
   "name": "challengers-bet",
   "version": "0.1.0",
   "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --recursive dev",
+    "build": "pnpm --recursive build",
+    "lint": "pnpm --recursive lint"
+  },
   "pnpm": {
     "ignoredBuiltDependencies": [
       "esbuild",

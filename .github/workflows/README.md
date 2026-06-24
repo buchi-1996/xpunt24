@@ -14,10 +14,10 @@
 | Secret | Value |
 |---|---|
 | `VPS_HOST` | The VPS IP or hostname (e.g. `xpunt24.com`) |
-| `VPS_USER` | The Linux user that owns `/opt/xpunt24` and runs pm2 (e.g. `deploy` or `ubuntu`) |
-| `VPS_SSH_KEY` | The **private key** of an SSH keypair whose **public** half is in the VPS user's `~/.ssh/authorized_keys`. Use a dedicated deploy key, not your personal key. |
+| `VPS_USER` | The Linux user that owns the deploy path and runs pm2 |
+| `VPS_SSH_KEY` | The **private key** of an SSH keypair whose **public** half is in the VPS user's `~/.ssh/authorized_keys`. Use a dedicated deploy key, not your personal key. Key must have no passphrase. |
 | `VPS_PORT` | Optional. SSH port if not 22. |
-| `VPS_DEPLOY_PATH` | The clone path on the VPS, e.g. `/opt/xpunt24` |
+| `VPS_DEPLOY_PATH` | The clone path on the VPS — for this project: `/home/payram-xpunt24` |
 
 Generate the keypair on your laptop:
 
@@ -32,16 +32,19 @@ ssh-keygen -t ed25519 -C "xpunt24-deploy" -f xpunt24-deploy-key
 The workflow assumes the VPS already has:
 
 - Node 20, pnpm 9, pm2 installed
-- The repo cloned at `$VPS_DEPLOY_PATH` (e.g. `/opt/xpunt24`) and configured to pull from GitHub (deploy key or PAT)
-- `backend/.env` and `frontend/.env` already populated (never committed)
-- pm2 processes already started and named `backend` and `frontend`:
+- The repo cloned at `/home/payram-xpunt24` and configured to pull from GitHub (deploy key or PAT)
+- `backend/.env` and `frontend/.env.production` already populated (never committed)
+- nginx fronting `api.xpunt24.com` → `localhost:4000` and `xpunt24.com` → `localhost:3003`
+- pm2 processes already started and named **`xpunt24-backend`** and **`xpunt24-frontend`**:
   ```bash
-  cd /opt/xpunt24
-  pm2 start --name backend "pnpm --filter backend start"
-  pm2 start --name frontend "pnpm --filter frontend start"
+  cd /home/payram-xpunt24
+  pm2 start --name xpunt24-backend "pnpm --filter backend start"
+  pm2 start --name xpunt24-frontend "pnpm --filter frontend start"
   pm2 save
   pm2 startup    # follow the printed command
   ```
+
+The workflow assumes those exact pm2 process names — `pm2 reload xpunt24-backend` / `pm2 reload xpunt24-frontend`. If you renamed them, update `.github/workflows/deploy.yml` to match.
 
 After that, every `git push` to `main` triggers an auto-deploy.
 

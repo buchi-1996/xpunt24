@@ -57,7 +57,7 @@ jobs:
             echo "→ Building workspace"
             pnpm build
             echo "→ Reloading services"
-            pm2 reload backend --update-env
-            pm2 reload frontend --update-env
+            pm2 reload xpunt24-backend --update-env
+            pm2 reload xpunt24-frontend --update-env
             pm2 save
             echo "→ Deploy complete"
