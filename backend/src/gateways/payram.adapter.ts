@@ -23,6 +23,47 @@ export interface PayRamWebhookPayload {
   tx_hash?: string
 }
 
+export type PayoutStatus =
+  | 'pending-approval'
+  | 'pending'
+  | 'approved'
+  | 'initiated'
+  | 'sent'
+  | 'processed'
+  | 'failed'
+  | 'rejected'
+  | 'cancelled'
+
+export interface PayoutResponse {
+  id: number
+  status: PayoutStatus
+  toAddress: string
+  amount: string
+  blockchainCode: string
+  currencyCode: string
+  createdAt?: string
+}
+
+export interface PayRamPayoutWebhookPayload {
+  event_type: string // payout.<status>
+  payout_id: number
+  network: string
+  token: string
+  amount: string
+  amount_usd?: string
+  email?: string
+  address: string
+  from_address?: string
+  tx_hash?: string
+  status: string
+  withdrawal_type?: string
+  currency_type?: string
+  created_at?: number
+  updated_at?: number
+  timestamp?: number
+  failure_reason?: string
+}
+
 class PayRamAdapter {
   private readonly baseUrl: string
   private readonly apiKey: string
@@ -100,6 +141,49 @@ class PayRamAdapter {
     const b = Buffer.from(provided, 'hex')
     if (a.length !== b.length || a.length === 0) return false
     return crypto.timingSafeEqual(a, b)
+  }
+
+  // PayRam payout — POST /api/v1/withdrawal/merchant
+  // Returns a numeric `id` which is the payout reference; we store it on the Withdrawal row.
+  async createPayout(params: {
+    amount: string
+    customerEmail: string
+    customerID: string
+    toAddress: string
+    blockchainCode?: string // default TRX
+    currencyCode?: string // default USDT
+  }): Promise<PayoutResponse> {
+    const res = await fetch(`${this.baseUrl}/api/v1/withdrawal/merchant`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify({
+        email: params.customerEmail,
+        customerID: params.customerID,
+        toAddress: params.toAddress,
+        amount: params.amount,
+        blockchainCode: params.blockchainCode ?? 'TRX',
+        currencyCode: params.currencyCode ?? 'USDT',
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new AppError(`PayRam payout ${res.status}: ${body}`, 502, 'GATEWAY_ERROR')
+    }
+    const data = (await res.json()) as PayoutResponse
+    if (!data.id) throw new AppError('PayRam payout returned no id', 502, 'GATEWAY_ERROR')
+    return data
+  }
+
+  // GET /api/v1/withdrawal/{id}/merchant — used by status-polling cron as a safety net to webhooks.
+  async getPayoutStatus(payoutId: string | number): Promise<PayoutResponse & { tx_hash?: string }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/withdrawal/${payoutId}/merchant`, {
+      headers: { 'API-Key': this.apiKey },
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new AppError(`PayRam payout-status ${res.status}: ${body}`, 502, 'GATEWAY_ERROR')
+    }
+    return (await res.json()) as PayoutResponse & { tx_hash?: string }
   }
 
   async getDepositStatus(providerReference: string): Promise<DepositStatusResponse> {

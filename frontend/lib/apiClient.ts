@@ -69,7 +69,11 @@ export const api = {
         `/wallet/deposits/${id}`,
       ),
     withdraw: (body: { amount: number; currency?: string; destinationAddress: string }) =>
-      post('/wallet/withdraw', body),
+      post<{ data: WithdrawalItem }>('/wallet/withdraw', body),
+    listWithdrawals: (page?: number) =>
+      get<{ data: WithdrawalItem[]; total: number; page: number; totalPages: number }>(
+        `/wallet/withdrawals${page ? `?page=${page}` : ''}`,
+      ),
   },
 
   fixtures: {
@@ -139,6 +143,28 @@ export interface NotificationItem {
   body: string
   read: boolean
   data?: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export type WithdrawalStatus =
+  | 'PENDING'
+  | 'UNDER_REVIEW'
+  | 'APPROVED'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'REJECTED'
+  | 'FAILED'
+
+export interface WithdrawalItem {
+  _id: string
+  amount: string
+  currency: string
+  status: WithdrawalStatus
+  destinationAddress: string
+  txHash?: string
+  rejectionReason?: string
+  processedAt?: string
   createdAt: string
   updatedAt: string
 }

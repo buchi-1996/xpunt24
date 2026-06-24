@@ -19,6 +19,7 @@ export interface IWithdrawalDocument extends Document {
   destinationAddress: string
   txHash?: string
   networkFee?: Types.Decimal128
+  providerReference?: string
   reviewedBy?: Types.ObjectId
   reviewedAt?: Date
   rejectionReason?: string
@@ -41,6 +42,7 @@ const withdrawalSchema = new Schema<IWithdrawalDocument>(
     destinationAddress: { type: String, required: true },
     txHash: { type: String, sparse: true },
     networkFee: { type: Schema.Types.Decimal128 },
+    providerReference: { type: String, sparse: true, index: true },
     reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     reviewedAt: { type: Date },
     rejectionReason: { type: String },

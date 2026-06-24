@@ -337,6 +337,49 @@ class WalletService {
     }
   }
 
+  // Reverses a withdrawal — credits the funds back and records a WITHDRAWAL_REVERSAL ledger entry.
+  // Used when a gateway payout fails, when an admin rejects an UNDER_REVIEW row, or for cleanup.
+  async refundWithdrawal(
+    userId: string,
+    amount: string | number,
+    withdrawalId: string,
+    session?: ClientSession,
+  ): Promise<void> {
+    const amountDecimal = toDecimal(amount, 'amount')
+    const amountNum = parseFloat(String(amount))
+
+    const wallet = await getOrCreateWallet(userId, DEFAULT_CURRENCY, session)
+    const updated = await WalletAccount.findOneAndUpdate(
+      { _id: wallet._id },
+      { $inc: { balance: amountDecimal } },
+      { new: false, session },
+    )
+    if (!updated) throw new AppError('Wallet not found', 404)
+
+    const balanceBefore = updated.balance
+    const balanceAfter = Types.Decimal128.fromString(
+      String(parseFloat(updated.balance.toString()) + amountNum),
+    )
+
+    const sourceId = `${withdrawalId}:${LedgerEntryType.WITHDRAWAL_REVERSAL}`
+    try {
+      await createLedgerEntry(
+        updated,
+        LedgerEntryType.WITHDRAWAL_REVERSAL,
+        amountDecimal,
+        balanceBefore,
+        balanceAfter,
+        sourceId,
+        'Withdrawal',
+        `Withdrawal refund: ${withdrawalId}`,
+        session,
+      )
+    } catch (err: unknown) {
+      if ((err as { code?: number }).code === 11000) return
+      throw err
+    }
+  }
+
   async getBalance(userId: string): Promise<IWalletAccountDocument | null> {
     return WalletAccount.findOne({ userId: new Types.ObjectId(userId), currency: DEFAULT_CURRENCY })
   }
