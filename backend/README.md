@@ -27,7 +27,7 @@ Copy `.env.example` from the repo root into `backend/.env` and fill in the value
 | `REDIS_URL` | yes | e.g. `redis://localhost:6379` |
 | `CRON_SECRET` | yes | Bearer token for `/cron/*` endpoints |
 | `PLATFORM_FEE_PERCENT` | no | Default `5` |
-| `MIN_STAKE` | no | Default `100` |
+| `MIN_STAKE` | no | Default `2` (USDT) |
 | `MAX_STAKE` | yes | Hard cap per challenge |
 | `MIN_DEPOSIT` | yes | |
 | `MIN_WITHDRAWAL` | yes | |

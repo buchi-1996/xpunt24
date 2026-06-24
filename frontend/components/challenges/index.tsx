@@ -16,7 +16,7 @@ import Image from 'next/image'
 import { api } from '@/lib/apiClient'
 
 export interface ChallengeProps {
-  id: string
+  _id: string
   matchData: unknown
   amount: number
   challengerPick: string | null
@@ -74,7 +74,7 @@ const ChallengeSlides = () => {
               >
                 <CarouselContent className="-ml-1">
                   {challenges.map((challenge: ChallengeProps) => (
-                    <CarouselItem key={challenge.id} className="pl-1 md:basis-full lg:basis-1/2">
+                    <CarouselItem key={challenge._id} className="pl-1 md:basis-full lg:basis-1/2">
                       <BetCard {...challenge} />
                     </CarouselItem>
                   ))}

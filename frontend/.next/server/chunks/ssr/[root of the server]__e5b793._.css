@@ -726,6 +726,14 @@ body {
   top: 50%;
 }
 
+.-right-0\.5 {
+  right: -.125rem;
+}
+
+.-top-0\.5 {
+  top: -.125rem;
+}
+
 .z-10 {
   z-index: 10;
 }
@@ -871,8 +879,23 @@ body {
   margin-top: auto;
 }
 
+.mt-1\.5 {
+  margin-top: .375rem;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .block {
   display: block;
+}
+
+.inline-block {
+  display: inline-block;
 }
 
 .inline {
@@ -971,6 +994,10 @@ body {
   max-height: var(--radix-dropdown-menu-content-available-height);
 }
 
+.max-h-96 {
+  max-height: 24rem;
+}
+
 .w-10 {
   width: 2.5rem;
 }
@@ -1063,12 +1090,20 @@ body {
   width: 100%;
 }
 
+.w-80 {
+  width: 20rem;
+}
+
 .min-w-0 {
   min-width: 0;
 }
 
 .min-w-\[8rem\] {
   min-width: 8rem;
+}
+
+.min-w-4 {
+  min-width: 1rem;
 }
 
 .max-w-7xl {
@@ -1085,6 +1120,10 @@ body {
 
 .max-w-sm {
   max-width: 24rem;
+}
+
+.max-w-\[calc\(100vw-1rem\)\] {
+  max-width: calc(100vw - 1rem);
 }
 
 .flex-1 {
@@ -1331,6 +1370,12 @@ body {
   --tw-space-y-reverse: 0;
   margin-top: calc(2rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(2rem * var(--tw-space-y-reverse));
+}
+
+.divide-y > :not([hidden]) ~ :not([hidden]) {
+  --tw-divide-y-reverse: 0;
+  border-top-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+  border-bottom-width: calc(1px * var(--tw-divide-y-reverse));
 }
 
 .place-self-start {
@@ -1637,6 +1682,15 @@ body {
   background-color: rgb(253 224 71 / var(--tw-bg-opacity, 1));
 }
 
+.bg-blue-50\/50 {
+  background-color: #eff6ff80;
+}
+
+.bg-blue-500 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
+}
+
 .bg-btn-bg {
   background-image: linear-gradient(to right, #4439df, #15206d);
 }
@@ -1723,6 +1777,10 @@ body {
   padding: 1px;
 }
 
+.p-0 {
+  padding: 0;
+}
+
 .px-2 {
   padding-left: .5rem;
   padding-right: .5rem;
@@ -1796,6 +1854,16 @@ body {
 .py-6 {
   padding-top: 1.5rem;
   padding-bottom: 1.5rem;
+}
+
+.px-1 {
+  padding-left: .25rem;
+  padding-right: .25rem;
+}
+
+.py-8 {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
 }
 
 .pb-2 {
@@ -1923,6 +1991,10 @@ body {
 .text-xs {
   font-size: .75rem;
   line-height: 1rem;
+}
+
+.text-\[10px\] {
+  font-size: 10px;
 }
 
 .font-bold {
@@ -2105,6 +2177,11 @@ body {
 .text-white {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.text-gray-300 {
+  --tw-text-opacity: 1;
+  color: rgb(209 213 219 / var(--tw-text-opacity, 1));
 }
 
 .underline-offset-4 {
@@ -2497,6 +2574,20 @@ body {
   background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
 }
 
+.hover\:bg-gray-100:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-gray-50:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(249 250 251 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-white\/10:hover {
+  background-color: #ffffff1a;
+}
+
 .hover\:text-accent-foreground:hover {
   color: hsl(var(--accent-foreground));
 }
@@ -2514,6 +2605,11 @@ body {
 .hover\:text-white:hover {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.hover\:text-blue-700:hover {
+  --tw-text-opacity: 1;
+  color: rgb(29 78 216 / var(--tw-text-opacity, 1));
 }
 
 .hover\:underline:hover {
@@ -2580,6 +2676,11 @@ body {
 
 .focus-visible\:ring-ring:focus-visible {
   --tw-ring-color: hsl(var(--ring));
+}
+
+.focus-visible\:ring-white:focus-visible {
+  --tw-ring-opacity: 1;
+  --tw-ring-color: rgb(255 255 255 / var(--tw-ring-opacity, 1));
 }
 
 .focus-visible\:ring-offset-2:focus-visible {

@@ -55,7 +55,7 @@ const Challenges = () => {
               <div className="col-span-6 w-full">
                 <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
                   {[...challenges].reverse().map(challenge => (
-                    <BetCard key={challenge.id} {...challenge} />
+                    <BetCard key={challenge._id} {...challenge} />
                   ))}
                 </div>
               </div>

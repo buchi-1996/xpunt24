@@ -17,6 +17,7 @@ import { ChevronDownIcon, EyeIcon, RefreshCwIcon } from 'lucide-react'
 import { useAuth } from '@/context/auth/AuthContext'
 import { useWallet } from '@/context/wallet/WalletContect'
 import LogoutMenu from './LogoutMenu.tsx'
+import NotificationBell from './NotificationBell'
 
 const LoggedInHeader = () => {
     const { user } = useAuth()
@@ -31,7 +32,8 @@ const LoggedInHeader = () => {
             <div className="container">
                 <div className='flex flex-row items-center py-3 justify-between'>
                     <Link href="/"><h4 className='font-bold text-xl text-white'>Xpunt24</h4></Link>
-                    <div className='flex flex-row items-center gap-4'>
+                    <div className='flex flex-row items-center gap-3'>
+                        <NotificationBell />
                         <DropdownMenu>
                             <div className='flex flex-row items-center gap-1'>
                                 <span className='text-white font-bold text-sm'>{balance} USDT</span>

@@ -8,17 +8,17 @@ import { format } from 'date-fns'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 
 export interface BetCardProps {
-  id: string
+  _id: string
   matchData: unknown
   amount: number
   challengerPick: string | null
   opposerPick: string | null
-  challenger: {
-    username: string | null
-    name: string | null
-    walletBalance: number
-    image: string | null
-  }
+  challenger?: {
+    username?: string | null
+    name?: string | null
+    walletBalance?: number
+    image?: string | null
+  } | null
 }
 
 interface ExpectedMatchData {
@@ -49,13 +49,13 @@ function isValidMatchData(data: unknown): data is ExpectedMatchData {
   )
 }
 
-const BetCard = ({ id, matchData, amount, challenger, challengerPick, opposerPick }: BetCardProps) => {
+const BetCard = ({ _id, matchData, amount, challenger, challengerPick, opposerPick }: BetCardProps) => {
   const { openModal } = useModal()
+  const challengerName = challenger?.name ?? challenger?.username ?? 'Anonymous'
+  const challengerImage = challenger?.image ?? ''
   const avatarFallback =
-    (challenger.name?.charAt(0)?.toUpperCase() ??
-      challenger.username?.charAt(0)?.toUpperCase() ?? '') +
-    (challenger.name?.charAt(1)?.toUpperCase() ??
-      challenger.username?.charAt(1)?.toUpperCase() ?? '')
+    (challengerName.charAt(0)?.toUpperCase() ?? '') +
+    (challengerName.charAt(1)?.toUpperCase() ?? '')
 
   if (!isValidMatchData(matchData)) {
     return (
@@ -75,12 +75,12 @@ const BetCard = ({ id, matchData, amount, challenger, challengerPick, opposerPic
       <div className="flex flex-row items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Avatar className='border-2 w-8 h-8 border-black'>
-            <AvatarImage src={`${challenger.image}`} />
+            <AvatarImage src={challengerImage} />
             <AvatarFallback>{avatarFallback}</AvatarFallback>
           </Avatar>
-          <h4 className="font-bold text-[0.7rem]">{challenger.name || challenger.username}</h4>
+          <h4 className="font-bold text-[0.7rem]">{challengerName}</h4>
         </div>
-        <h4 className="text-xs font-bold bg-gray-50 rounded-lg p-2 text-gray-900">₦{amount}</h4>
+        <h4 className="text-xs font-bold bg-gray-50 rounded-lg p-2 text-gray-900">{amount} USDT</h4>
       </div>
       <div className="grid grid-cols-7 gap-2 w-full mb-4">
         <div className="col-span-2 grid place-items-center">
@@ -112,7 +112,7 @@ const BetCard = ({ id, matchData, amount, challenger, challengerPick, opposerPic
         </div>
       </div>
       <Button
-        onClick={() => openModal(<Oppose id={id} match={matchData} amount={amount} opposerPick={opposerPick} />)}
+        onClick={() => openModal(<Oppose id={_id} match={matchData} amount={amount} opposerPick={opposerPick} />)}
         variant="secondary"
         className="w-full"
       >

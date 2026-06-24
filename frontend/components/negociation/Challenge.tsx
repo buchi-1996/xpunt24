@@ -9,6 +9,7 @@ import { useModal } from '@/hooks/useModal'
 import LoaderSpinner from '../spinner'
 import { useWallet } from '@/context/wallet/WalletContect'
 import { api } from '@/lib/apiClient'
+import { MIN_STAKE } from '@/lib/constants'
 import { Match } from '@/types'
 
 type ChallengeProps = {
@@ -33,8 +34,8 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
   }
 
   const handleCreateChallenge = () => {
-    if (!input || Number(input) < 100) {
-      toast.error('Please enter a valid amount (minimum 100)')
+    if (!input || Number(input) < MIN_STAKE) {
+      toast.error(`Please enter a valid amount (minimum ${MIN_STAKE} USDT)`)
       return
     }
     if (!selectedOption) {
@@ -109,7 +110,7 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
           />
         </div>
         <small className="text-xs text-gray-600">
-          Min stake <span className="font-bold">100</span>
+          Min stake <span className="font-bold">{MIN_STAKE} USDT</span>
         </small>
         <div className="flex items-center justify-between my-6 border-t border-b py-2">
           <h4 className="font-bold text-gray-600">Potential win:</h4>

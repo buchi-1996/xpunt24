@@ -123,10 +123,22 @@ export const api = {
 
   notifications: {
     list: (page?: number) =>
-      get<{ data: unknown[]; total: number; page: number; totalPages: number }>(
+      get<{ data: NotificationItem[]; total: number; page: number; totalPages: number }>(
         `/notifications${page ? `?page=${page}` : ''}`,
       ),
-    markRead: (id: string) => patch<{ data: unknown }>(`/notifications/${id}/read`),
+    markRead: (id: string) => patch<{ data: NotificationItem }>(`/notifications/${id}/read`),
     markAllRead: () => patch<{ success: boolean }>('/notifications/read-all'),
   },
+}
+
+export interface NotificationItem {
+  _id: string
+  userId: string
+  type: string
+  title: string
+  body: string
+  read: boolean
+  data?: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
 }

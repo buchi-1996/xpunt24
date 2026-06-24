@@ -8,7 +8,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1),
   GOOGLE_CALLBACK_URL: z.string().url(),
   PLATFORM_FEE_PERCENT: z.coerce.number().default(5),
-  MIN_STAKE: z.coerce.number().default(100),
+  MIN_STAKE: z.coerce.number().default(2),
   MAX_STAKE: z.coerce.number(),
   MIN_DEPOSIT: z.coerce.number(),
   MIN_WITHDRAWAL: z.coerce.number(),

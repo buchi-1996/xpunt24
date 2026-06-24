@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  type-check:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @challengers-bet/shared build
+
+      - name: Type check backend
+        run: pnpm --filter backend exec tsc --noEmit
+
+  deploy:
+    name: Deploy to VPS
+    needs: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            echo "→ Pulling latest from main"
+            git fetch --all --prune
+            git reset --hard origin/main
+            echo "→ Installing dependencies"
+            pnpm install --frozen-lockfile
+            echo "→ Building workspace"
+            pnpm build
+            echo "→ Reloading services"
+            pm2 reload backend --update-env
+            pm2 reload frontend --update-env
+            pm2 save
+            echo "→ Deploy complete"
