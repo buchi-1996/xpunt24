@@ -155,13 +155,17 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
 // won't recognize the directive and the cookie persists. Same httpOnly / secure / sameSite /
 // domain as the original `res.cookie(...)` call.
 router.post('/logout', (_req: Request, res: Response) => {
-  res.clearCookie(COOKIE_NAME, {
+  const base = {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     path: '/',
-    ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
-  })
+  }
+  // Clear the domain-scoped cookie (current scheme)...
+  if (env.COOKIE_DOMAIN) res.clearCookie(COOKIE_NAME, { ...base, domain: env.COOKIE_DOMAIN })
+  // ...and any legacy host-only cookie set before COOKIE_DOMAIN existed, otherwise it survives
+  // logout and keeps the session alive on api.xpunt24.com.
+  res.clearCookie(COOKIE_NAME, base)
   res.json({ message: 'Logged out' })
 })
 
