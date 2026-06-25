@@ -121,6 +121,7 @@ router.get(
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
         sameSite: 'lax',
+        path: '/',
         maxAge: COOKIE_MAX_AGE_MS,
         ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
       })
@@ -149,11 +150,16 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
   }
 })
 
-// POST /auth/logout — clear auth cookie
+// POST /auth/logout — clear auth cookie.
+// IMPORTANT: clearCookie options MUST match what was set in /callback/google, or the browser
+// won't recognize the directive and the cookie persists. Same httpOnly / secure / sameSite /
+// domain as the original `res.cookie(...)` call.
 router.post('/logout', (_req: Request, res: Response) => {
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
+    secure: env.NODE_ENV === 'production',
     sameSite: 'lax',
+    path: '/',
     ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
   })
   res.json({ message: 'Logged out' })
