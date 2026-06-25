@@ -25,7 +25,7 @@ const Home = async ({searchParams}: { searchParams: Promise<{ league?: string }>
   // console.log('The fixtures', fixtures)
 
   return (
-    <div key={Math.random()}>
+    <div>
       <Hero />
       <section className="py-6 md:py-10">
         <div className="sm:container">

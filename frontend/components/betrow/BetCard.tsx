@@ -60,9 +60,11 @@ const BetCard = ({ _id, matchData, amount, challenger, challengerPick, opposerPi
     (challengerName.charAt(1)?.toUpperCase() ?? '')
 
   if (!isValidMatchData(matchData)) {
+    // Defensive fallback — callers should filter these out, but if one slips through,
+    // render a quiet placeholder rather than a scary red error.
     return (
       <div className="bg-white rounded-2xl w-full p-4">
-        <div className="text-center text-red-500">Invalid match data</div>
+        <p className="text-xs text-gray-400 text-center">Match details unavailable</p>
       </div>
     )
   }

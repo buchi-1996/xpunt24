@@ -29,6 +29,18 @@ export interface ChallengeProps {
   }
 }
 
+// Drop rows the backend couldn't resolve to a real fixture — happens when an old challenge
+// references a fixtureId that the fixture API no longer returns (deleted, postponed, or the
+// previous api-sports key was suspended). Showing them as "Invalid match data" cards is worse
+// than just not surfacing them in the featured carousel.
+function hasValidMatchData(c: ChallengeProps): boolean {
+  const m = c.matchData as { fixture?: { timestamp?: number }; teams?: { home?: { name?: string }; away?: { name?: string } } } | null
+  if (!m || typeof m !== 'object') return false
+  if (typeof m.fixture?.timestamp !== 'number') return false
+  if (!m.teams?.home?.name || !m.teams?.away?.name) return false
+  return true
+}
+
 const ChallengeSlides = () => {
   const plugin = React.useRef(
     Autoplay({ delay: 2000, stopOnInteraction: false, stopOnMouseEnter: true })
@@ -38,7 +50,8 @@ const ChallengeSlides = () => {
   useEffect(() => {
     api.challenges.list({ status: 'OPEN' })
       .then((res) => {
-        setChallenges(res.data as ChallengeProps[])
+        const valid = (res.data as ChallengeProps[]).filter(hasValidMatchData)
+        setChallenges(valid)
       })
       .catch((err) => console.error('Error fetching challenges:', err))
   }, [])
