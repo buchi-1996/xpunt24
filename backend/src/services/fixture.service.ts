@@ -80,7 +80,15 @@ class FixtureService {
 
   async getLiveData(
     id: string,
-  ): Promise<{ playedTime: number; status: string; isLive: boolean; homeScore: number; awayScore: number }> {
+  ): Promise<{
+    playedTime: number
+    status: string
+    isLive: boolean
+    homeScore: number
+    awayScore: number
+    halftimeHome: number | null
+    halftimeAway: number | null
+  }> {
     const cacheKey = `fixtures:live:${id}`
     const cached = await redis.get(cacheKey)
     if (cached)
@@ -90,6 +98,8 @@ class FixtureService {
         isLive: boolean
         homeScore: number
         awayScore: number
+        halftimeHome: number | null
+        halftimeAway: number | null
       }
 
     const data = await fetchFromApi(`/fixtures?id=${id}&live=all`)
@@ -100,6 +110,7 @@ class FixtureService {
     ) as {
       fixture: { status: { short: string; elapsed: number } }
       goals: { home: number | null; away: number | null }
+      score?: { halftime?: { home: number | null; away: number | null } }
     }
 
     const result = {
@@ -108,9 +119,12 @@ class FixtureService {
       isLive: isLive(fixture?.fixture?.status?.short ?? ''),
       homeScore: fixture?.goals?.home ?? 0,
       awayScore: fixture?.goals?.away ?? 0,
+      // Halftime is null during 1H — only set once HT/2H/FT reached
+      halftimeHome: fixture?.score?.halftime?.home ?? null,
+      halftimeAway: fixture?.score?.halftime?.away ?? null,
     }
 
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 300)
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 60)
     return result
   }
 

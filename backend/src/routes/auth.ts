@@ -122,6 +122,7 @@ router.get(
         secure: env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: COOKIE_MAX_AGE_MS,
+        ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
       })
 
       // Redirect to the web app after successful login, honoring any signed-in-from state.
@@ -150,7 +151,11 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
 
 // POST /auth/logout — clear auth cookie
 router.post('/logout', (_req: Request, res: Response) => {
-  res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: 'lax' })
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: 'lax',
+    ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
+  })
   res.json({ message: 'Logged out' })
 })
 

@@ -20,6 +20,9 @@ const envSchema = z.object({
   PAYRAM_API_KEY: z.string().min(1),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
+  // Optional. Set to e.g. `.xpunt24.com` in production so the auth cookie is visible to
+  // both api.xpunt24.com (backend) and xpunt24.com (frontend). Leave unset in dev.
+  COOKIE_DOMAIN: z.string().optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)

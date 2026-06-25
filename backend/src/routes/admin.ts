@@ -23,7 +23,7 @@ router.post(
   requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { outcome, notes } = req.body as { outcome: SettlementOutcome; notes?: string }
+      const { notes } = req.body as { outcome?: SettlementOutcome; notes?: string }
       const challengeId = String(req.params['id'])
       const adminId = req.user!.id
 
@@ -36,7 +36,7 @@ router.post(
         ipAddress: req.ip,
       })
 
-      await settlementService.settleChallenge(challengeId, outcome, 'ADMIN', adminId)
+      await settlementService.settleChallenge(challengeId, 'ADMIN', adminId)
 
       res.json({ success: true })
     } catch (err) {

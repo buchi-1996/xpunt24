@@ -86,10 +86,50 @@ export function determineOutcome(
   }
 }
 
+function inferOutcome(homeScore: number, awayScore: number): SettlementOutcome {
+  if (homeScore > awayScore) return 'HOME_WIN'
+  if (awayScore > homeScore) return 'AWAY_WIN'
+  return 'DRAW'
+}
+
+// Markets whose outcome is decidable from live score alone:
+//   OVER_UNDER (OVER side): total > threshold
+//   BOTH_TEAMS_TO_SCORE (YES side): both > 0
+// 1H markets get settled at HT or later via the same logic but using halftime scores.
+// UNDER, NO, and 1X2-style picks can't be resolved early — wait for FT.
+function canSettleEarlyForMarket(
+  market: Market,
+  marketParam: string | undefined,
+  fixture: { homeScore: number; awayScore: number; halftimeHome: number | null; halftimeAway: number | null; status: string },
+): boolean {
+  const ht = fixture.halftimeHome !== null && fixture.halftimeAway !== null
+  const reachedHT = ht || ['HT', '2H', 'ET', 'BT', 'P', 'FT', 'AET', 'PEN'].includes(fixture.status)
+  const threshold = marketParam ? parseFloat(marketParam) : 2.5
+
+  switch (market) {
+    case Market.OVER_UNDER: {
+      const total = fixture.homeScore + fixture.awayScore
+      return total > threshold // OVER side certain
+    }
+    case Market.BOTH_TEAMS_TO_SCORE:
+      return fixture.homeScore > 0 && fixture.awayScore > 0
+    case Market.FIRST_HALF_OVER_UNDER: {
+      if (!reachedHT) return false
+      const total1H = (fixture.halftimeHome ?? 0) + (fixture.halftimeAway ?? 0)
+      return total1H > threshold || ['HT', '2H', 'ET', 'BT', 'P', 'FT', 'AET', 'PEN'].includes(fixture.status)
+    }
+    case Market.FIRST_HALF_BOTH_TEAMS_TO_SCORE:
+    case Market.FIRST_HALF_WINNER:
+      // Once HT is reached, 1H markets are fully decided either way.
+      return reachedHT
+    default:
+      return false
+  }
+}
+
 class SettlementService {
   async settleChallenge(
     challengeId: string,
-    outcome: SettlementOutcome,
     settledBy: 'AUTO' | 'ADMIN',
     adminId?: string,
   ) {
@@ -101,8 +141,23 @@ class SettlementService {
     if (!challenge.opponentId) throw new AppError('Challenge has no opponent', 400)
 
     const fixture = await fixtureService.getCompletedFixture(challenge.fixtureId)
+    await this._settleWithFixture(challenge, fixture, settledBy, adminId)
+  }
 
-    // Determine winner by checking creator's pick
+  /**
+   * Settle once we have authoritative scores (either FT or an early-decidable in-play state).
+   * Shared path used by FT settlement, admin settlement, and early settlement.
+   */
+  private async _settleWithFixture(
+    challenge: InstanceType<typeof Challenge>,
+    fixture: { homeScore: number; awayScore: number; halftimeHome: number; halftimeAway: number },
+    settledBy: 'AUTO' | 'AUTO_EARLY' | 'ADMIN',
+    adminId?: string,
+    settledAtMinute?: number,
+  ) {
+    if (!challenge.opponentId) throw new AppError('Challenge has no opponent', 400)
+    const challengeId = challenge._id.toString()
+
     const creatorWins = determineOutcome(challenge.market, challenge.pick, fixture, challenge.marketParam)
     const winnerId = creatorWins
       ? challenge.creatorId.toString()
@@ -111,11 +166,11 @@ class SettlementService {
       ? challenge.opponentId.toString()
       : challenge.creatorId.toString()
 
+    const outcome = inferOutcome(fixture.homeScore, fixture.awayScore)
     const stakeNum = parseFloat(challenge.stake.toString())
 
     const session = await mongoose.startSession()
     await session.withTransaction(async () => {
-      // Settle wallet
       await walletService.settleWager(
         winnerId,
         loserId,
@@ -125,7 +180,6 @@ class SettlementService {
         session,
       )
 
-      // Create settlement record
       await Settlement.create(
         [
           {
@@ -134,6 +188,7 @@ class SettlementService {
             outcome,
             settledBy,
             adminUserId: adminId ? new Types.ObjectId(adminId) : undefined,
+            settledAtMinute,
             totalPaidOut: challenge.potentialWin,
             currency: challenge.currency,
           },
@@ -141,7 +196,6 @@ class SettlementService {
         { session },
       )
 
-      // Update challenge
       await Challenge.findByIdAndUpdate(
         challengeId,
         {
@@ -152,7 +206,6 @@ class SettlementService {
         { session },
       )
 
-      // Update wagers
       await Wager.updateMany(
         { challengeId: challenge._id, userId: new Types.ObjectId(winnerId) },
         { status: WagerStatus.WON, result: WagerResult.WIN, settledAt: new Date() },
@@ -166,29 +219,31 @@ class SettlementService {
     })
     session.endSession()
 
-    // Update UserStats (outside transaction — non-critical)
     await this.updateUserStats(winnerId, true)
     await this.updateUserStats(loserId, false)
 
-    // Notifications
+    const isEarly = settledBy === 'AUTO_EARLY'
+    const winnerTitle = isEarly ? 'Challenge Settled Early — You Won!' : 'Challenge Settled — You Won!'
+    const loserTitle = isEarly ? 'Challenge Settled Early' : 'Challenge Settled'
+    const minuteSuffix = settledAtMinute ? ` (decided at ${settledAtMinute}')` : ''
+
     await notificationService.create(
       winnerId,
       'CHALLENGE_SETTLED',
-      'Challenge Settled — You Won!',
-      `You won your challenge. ${challenge.potentialWin} ${challenge.currency} has been credited.`,
-      { challengeId },
+      winnerTitle,
+      `You won your challenge${minuteSuffix}. ${challenge.potentialWin} ${challenge.currency} has been credited.`,
+      { challengeId, settledAtMinute },
     )
     await notificationService.create(
       loserId,
       'CHALLENGE_SETTLED',
-      'Challenge Settled',
-      'Your challenge has been settled. Better luck next time!',
-      { challengeId },
+      loserTitle,
+      `Your challenge has been settled${minuteSuffix}. Better luck next time!`,
+      { challengeId, settledAtMinute },
     )
 
-    // Socket events
-    socketService.emitToUser(winnerId, SocketEvent.CHALLENGE_SETTLED, { challengeId, result: 'WIN' })
-    socketService.emitToUser(loserId, SocketEvent.CHALLENGE_SETTLED, { challengeId, result: 'LOSS' })
+    socketService.emitToUser(winnerId, SocketEvent.CHALLENGE_SETTLED, { challengeId, result: 'WIN', early: isEarly })
+    socketService.emitToUser(loserId, SocketEvent.CHALLENGE_SETTLED, { challengeId, result: 'LOSS', early: isEarly })
     socketService.emitToUser(winnerId, SocketEvent.WALLET_BALANCE_UPDATED, { userId: winnerId })
     socketService.emitToUser(loserId, SocketEvent.WALLET_BALANCE_UPDATED, { userId: loserId })
   }
@@ -200,8 +255,7 @@ class SettlementService {
     for (const challenge of matchedChallenges) {
       try {
         await fixtureService.getCompletedFixture(challenge.fixtureId)
-        // Fixture is completed — settle it
-        await this.settleChallenge(challenge._id.toString(), 'HOME_WIN', 'AUTO')
+        await this.settleChallenge(challenge._id.toString(), 'AUTO')
         settled++
       } catch {
         // Fixture not finished yet — skip
@@ -292,6 +346,76 @@ class SettlementService {
     }
 
     return { processed: candidates.length, expired }
+  }
+
+  /**
+   * Early settlement sweep — settles MATCHED challenges whose outcome is mathematically certain
+   * before full time. Examples:
+   *   - Over 1.5 once a 2nd goal goes in
+   *   - BTTS Yes once both teams have scored
+   *   - 1H markets once the half-time whistle has gone
+   * Anything still uncertain is left for `processCompletedMatches` at FT.
+   */
+  async processEarlySettlements(): Promise<{ processed: number; settledEarly: number }> {
+    const matched = await Challenge.find({ status: ChallengeStatus.MATCHED })
+    if (matched.length === 0) return { processed: 0, settledEarly: 0 }
+
+    const byFixture = new Map<string, typeof matched>()
+    for (const c of matched) {
+      const arr = byFixture.get(c.fixtureId) ?? []
+      arr.push(c)
+      byFixture.set(c.fixtureId, arr)
+    }
+
+    let settledEarly = 0
+    for (const [fixtureId, group] of byFixture) {
+      let live: Awaited<ReturnType<typeof fixtureService.getLiveData>>
+      try {
+        live = await fixtureService.getLiveData(fixtureId)
+      } catch (err) {
+        console.error(`processEarlySettlements: live fetch failed for ${fixtureId}:`, err)
+        continue
+      }
+
+      // Skip pre-match fixtures entirely
+      if (live.status === 'NS' || live.status === 'TBD') continue
+
+      const fixtureForOutcome = {
+        homeScore: live.homeScore,
+        awayScore: live.awayScore,
+        halftimeHome: live.halftimeHome ?? 0,
+        halftimeAway: live.halftimeAway ?? 0,
+        status: live.status,
+      }
+
+      for (const challenge of group) {
+        try {
+          if (
+            !canSettleEarlyForMarket(challenge.market, challenge.marketParam, {
+              homeScore: live.homeScore,
+              awayScore: live.awayScore,
+              halftimeHome: live.halftimeHome,
+              halftimeAway: live.halftimeAway,
+              status: live.status,
+            })
+          ) {
+            continue
+          }
+          await this._settleWithFixture(
+            challenge,
+            fixtureForOutcome,
+            'AUTO_EARLY',
+            undefined,
+            live.playedTime || undefined,
+          )
+          settledEarly++
+        } catch (err) {
+          console.error(`processEarlySettlements: failed for ${challenge._id}:`, err)
+        }
+      }
+    }
+
+    return { processed: matched.length, settledEarly }
   }
 
   private async updateUserStats(userId: string, won: boolean) {

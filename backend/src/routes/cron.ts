@@ -42,4 +42,13 @@ router.post('/poll-payouts', verifyCronSecret, async (_req: Request, res: Respon
   }
 })
 
+router.post('/process-early', verifyCronSecret, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await settlementService.processEarlySettlements()
+    res.json({ success: true, ...result })
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

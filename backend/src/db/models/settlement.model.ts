@@ -7,9 +7,10 @@ export interface ISettlementDocument extends Document {
   challengeId: Types.ObjectId
   fixtureId: string
   outcome: SettlementOutcome
-  settledBy: 'AUTO' | 'ADMIN'
+  settledBy: 'AUTO' | 'AUTO_EARLY' | 'ADMIN'
   adminUserId?: Types.ObjectId
   notes?: string
+  settledAtMinute?: number // minute the early-settle decision was made (0 = pre-match impossible; FT >= 90)
   totalPaidOut: Types.Decimal128
   currency: string
   createdAt: Date
@@ -25,9 +26,10 @@ const settlementSchema = new Schema<ISettlementDocument>(
       enum: ['HOME_WIN', 'AWAY_WIN', 'DRAW', 'CANCELLED', 'VOID'],
       required: true,
     },
-    settledBy: { type: String, enum: ['AUTO', 'ADMIN'], required: true },
+    settledBy: { type: String, enum: ['AUTO', 'AUTO_EARLY', 'ADMIN'], required: true },
     adminUserId: { type: Schema.Types.ObjectId, ref: 'User' },
     notes: { type: String },
+    settledAtMinute: { type: Number },
     totalPaidOut: { type: Schema.Types.Decimal128, required: true },
     currency: { type: String, required: true },
   },

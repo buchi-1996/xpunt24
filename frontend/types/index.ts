@@ -159,39 +159,50 @@ export interface MatchData {
     };
   };
 }
-// Extended bet type with properly typed matchData
+export type ChallengeStatusValue =
+  | 'OPEN'
+  | 'MATCHED'
+  | 'LOCKED'
+  | 'SETTLED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'DISPUTED'
+
+export interface WagerUser {
+  _id: string;
+  name: string | null;
+  username?: string | null;
+  image: string | null;
+  walletBalance?: number;
+}
+
+// Mirrors what backend's enrichChallenges() returns.
 export interface WagerProps {
-  id: string;
-  amount: number;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  expiresAt?: Date | null;
-  completedAt?: Date | null;
-  challengerId: string;
-  opposerId?: string | null;
-  matchData: MatchData; // Properly typed instead of JsonValue
+  _id: string;
+  fixtureId: string;
+  creatorId: string;
+  opponentId?: string | null;
+  market: string;
+  marketParam?: string | null;
+  pick: string;
+  opponentPick: string;
+  stake: string; // Decimal128 serialized as string
+  amount: string; // alias for stake added by the enricher
+  currency: string;
+  potentialWin: string;
+  platformFee: string;
+  status: ChallengeStatusValue;
+  visibility: string;
+  expiresAt?: string | null;
+  settledAt?: string | null;
+  winnerUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  matchData: MatchData | null;
   challengerPick: string;
   opposerPick: string;
-  winnerId?: string | null;
-  loserPayout?: number | null;
-  platformFee?: number | null;
-  isPublic: boolean;
-  terms?: string | null;
-  challenger: {
-    id: string;
-    name: string | null;
-    username: string | null;
-    image: string | null;
-    walletBalance: number;
-  };
-  opposer?: {
-    id: string;
-    name: string | null;
-    username: string | null;
-    image: string | null;
-    walletBalance: number;
-  } | null;
+  challenger: WagerUser | null;
+  opposer: WagerUser | null;
 }
 
 

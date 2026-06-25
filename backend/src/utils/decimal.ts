@@ -8,8 +8,26 @@ import { AppError } from './AppError'
 export function serializeDecimal(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj
 
+  // Decimal128 -> string ("100" not { $numberDecimal: "100" })
   if (obj instanceof Types.Decimal128) {
     return obj.toString()
+  }
+
+  // ObjectId -> hex string. Without this, the recursive object walk below treats an
+  // ObjectId as a plain object, finds no enumerable own properties, and emits `{}`
+  // — which serializes to JSON as `{}` and breaks React keys / equality checks.
+  if (obj instanceof Types.ObjectId) {
+    return obj.toString()
+  }
+
+  // Date -> ISO string. Same reasoning as ObjectId: the walk would otherwise destroy it.
+  if (obj instanceof Date) {
+    return obj.toISOString()
+  }
+
+  // Buffer / Uint8Array -> base64 (rarely surfaced, but safer than dehydrating to {})
+  if (obj instanceof Uint8Array) {
+    return Buffer.from(obj).toString('base64')
   }
 
   if (Array.isArray(obj)) {
