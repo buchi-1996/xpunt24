@@ -48,12 +48,12 @@ const OddsTable = ({ match }: OddsTableProps) => {
       <div className="flex items-center gap-2">
         <div className="flex flex-row items-center gap-1 md:gap-2">
           <BookButton onClick={() => handleOptionClick("home")}>1</BookButton>
-          <BookButton onClick={() => handleOptionClick("draw")}>x</BookButton>
+          <BookButton onClick={() => handleOptionClick("draw")}>X</BookButton>
           <BookButton onClick={() => handleOptionClick("away")}>2</BookButton>
 
           <div className="hidden xl:flex items-center gap-2">
-            <BookButton onClick={() => handleOptionClick("over 2.5")}>over 2.5</BookButton>
-            <BookButton onClick={() => handleOptionClick("under 2.5")}>under 2.5</BookButton>
+            <BookButton onClick={() => handleOptionClick("over_25")}>O 2.5</BookButton>
+            <BookButton onClick={() => handleOptionClick("under_25")}>U 2.5</BookButton>
           </div>
         </div>
 

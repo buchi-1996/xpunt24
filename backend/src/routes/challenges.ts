@@ -17,9 +17,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { fixtureId, market, pick, stake, currency, visibility, expiresAt } = req.body as {
+    const { fixtureId, market, marketParam, pick, stake, currency, visibility, expiresAt } = req.body as {
       fixtureId: string
       market: Market
+      marketParam?: string
       pick: Pick
       stake: number | string
       currency?: string
@@ -29,6 +30,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     const challenge = await challengeService.createChallenge(req.user!.id, {
       fixtureId,
       market,
+      marketParam,
       pick,
       stake,
       currency,

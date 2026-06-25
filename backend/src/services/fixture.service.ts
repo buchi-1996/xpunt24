@@ -124,11 +124,23 @@ class FixtureService {
     return data
   }
 
-  async getCompletedFixture(id: string): Promise<{ homeScore: number; awayScore: number; status: string }> {
+  async getCompletedFixture(id: string): Promise<{
+    homeScore: number
+    awayScore: number
+    halftimeHome: number
+    halftimeAway: number
+    status: string
+  }> {
     const cacheKey = `fixtures:completed:${id}`
     const cached = await redis.get(cacheKey)
     if (cached)
-      return JSON.parse(cached) as { homeScore: number; awayScore: number; status: string }
+      return JSON.parse(cached) as {
+        homeScore: number
+        awayScore: number
+        halftimeHome: number
+        halftimeAway: number
+        status: string
+      }
 
     const data = await fetchFromApi(`/fixtures?id=${id}`)
     if (!data.length) throw new AppError('Fixture not found', 404)
@@ -136,6 +148,7 @@ class FixtureService {
     const fixture = data[0] as {
       fixture: { status: { short: string } }
       goals: { home: number | null; away: number | null }
+      score?: { halftime?: { home: number | null; away: number | null } }
     }
     const status = fixture?.fixture?.status?.short ?? ''
 
@@ -146,6 +159,8 @@ class FixtureService {
     const result = {
       homeScore: fixture?.goals?.home ?? 0,
       awayScore: fixture?.goals?.away ?? 0,
+      halftimeHome: fixture?.score?.halftime?.home ?? 0,
+      halftimeAway: fixture?.score?.halftime?.away ?? 0,
       status,
     }
 

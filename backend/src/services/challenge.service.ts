@@ -80,6 +80,7 @@ async function enrichChallenges(rawChallenges: Array<Record<string, unknown>>) {
 interface CreateChallengeBody {
   fixtureId: string
   market: Market
+  marketParam?: string
   pick: Pick
   stake: string | number
   currency?: string
@@ -95,7 +96,7 @@ interface ListChallengesFilters {
 
 class ChallengeService {
   async createChallenge(userId: string, body: CreateChallengeBody) {
-    const { fixtureId, market, pick, stake, currency = 'USDT', visibility, expiresAt } = body
+    const { fixtureId, market, marketParam, pick, stake, currency = 'USDT', visibility, expiresAt } = body
 
     // Validate pick is in enum
     if (!Object.values(Pick).includes(pick)) {
@@ -147,6 +148,7 @@ class ChallengeService {
     const counter = await this.findCompatibleOpenChallenge({
       fixtureId,
       market,
+      marketParam,
       pick: opponentPick,
       stake: stakeNum,
       currency,
@@ -181,6 +183,7 @@ class ChallengeService {
         creatorId: new Types.ObjectId(userId),
         fixtureId,
         market,
+        marketParam,
         pick,
         opponentPick,
         stake: toDecimal(stakeNum, 'stake'),
@@ -205,6 +208,7 @@ class ChallengeService {
       userId: new Types.ObjectId(userId),
       pick,
       market,
+      marketParam,
       stake: toDecimal(stakeNum, 'stake'),
       currency,
       potentialPayout: toDecimal(potentialWin, 'potentialPayout'),
@@ -254,6 +258,7 @@ class ChallengeService {
             userId: new Types.ObjectId(opponentId),
             pick: challenge.opponentPick,
             market: challenge.market,
+            marketParam: challenge.marketParam,
             stake: challenge.stake,
             currency: challenge.currency,
             potentialPayout: challenge.potentialWin,
@@ -361,13 +366,14 @@ class ChallengeService {
   private async findCompatibleOpenChallenge(criteria: {
     fixtureId: string
     market: Market
+    marketParam?: string
     pick: Pick // the pick the counter-party would have made (i.e. opposite of current user's pick)
     stake: number
     currency: string
     excludeUserId: string
   }): Promise<{ _id: Types.ObjectId; createdAt: Date; creatorId: Types.ObjectId } | null> {
     const now = new Date()
-    return Challenge.findOne({
+    const query: Record<string, unknown> = {
       fixtureId: criteria.fixtureId,
       market: criteria.market,
       pick: criteria.pick,
@@ -381,7 +387,16 @@ class ChallengeService {
         { expiresAt: null },
         { expiresAt: { $gt: now } },
       ],
-    })
+    }
+
+    // marketParam must match exactly — an Over/Under 1.5 doesn't match an Over/Under 2.5.
+    if (criteria.marketParam !== undefined) {
+      query['marketParam'] = criteria.marketParam
+    } else {
+      query['$and'] = [{ $or: [{ marketParam: { $exists: false } }, { marketParam: null }] }]
+    }
+
+    return Challenge.findOne(query)
       .sort({ createdAt: 1 })
       .select('_id createdAt creatorId')
       .lean<{ _id: Types.ObjectId; createdAt: Date; creatorId: Types.ObjectId } | null>()
@@ -400,6 +415,7 @@ class ChallengeService {
           creatorId: Types.ObjectId
           fixtureId: string
           market: Market
+          marketParam?: string
           opponentPick: Pick
           stake: Types.Decimal128
           currency: string
@@ -416,6 +432,7 @@ class ChallengeService {
       const counter = await this.findCompatibleOpenChallenge({
         fixtureId: challenge.fixtureId,
         market: challenge.market,
+        marketParam: challenge.marketParam,
         pick: challenge.opponentPick,
         stake: parseFloat(challenge.stake.toString()),
         currency: challenge.currency,

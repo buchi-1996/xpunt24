@@ -7,6 +7,7 @@ export interface IWagerDocument extends Document {
   userId: Types.ObjectId
   pick: Pick
   market: Market
+  marketParam?: string
   stake: Types.Decimal128
   currency: string
   potentialPayout: Types.Decimal128
@@ -23,6 +24,7 @@ const wagerSchema = new Schema<IWagerDocument>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     pick: { type: String, enum: Object.values(Pick), required: true },
     market: { type: String, enum: Object.values(Market), required: true },
+    marketParam: { type: String },
     stake: { type: Schema.Types.Decimal128, required: true },
     currency: { type: String, required: true },
     potentialPayout: { type: Schema.Types.Decimal128, required: true },

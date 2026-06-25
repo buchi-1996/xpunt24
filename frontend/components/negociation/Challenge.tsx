@@ -10,6 +10,7 @@ import LoaderSpinner from '../spinner'
 import { useWallet } from '@/context/wallet/WalletContect'
 import { api } from '@/lib/apiClient'
 import { useLimits } from '@/context/limits/LimitsContext'
+import { findPickOption } from '@/lib/picks'
 import { Match } from '@/types'
 
 type ChallengeProps = {
@@ -34,12 +35,14 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
     setInput(e.target.value)
   }
 
+  const option = findPickOption(selectedOption)
+
   const handleCreateChallenge = () => {
     if (!input || Number(input) < minStake) {
       toast.error(`Please enter a valid amount (minimum ${minStake} USDT)`)
       return
     }
-    if (!selectedOption) {
+    if (!option) {
       toast.error('Please select a pick option')
       return
     }
@@ -48,8 +51,9 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
       try {
         await api.challenges.create({
           fixtureId: String(match.fixture.id),
-          market: 'MATCH_WINNER',
-          pick: selectedOption.toUpperCase(),
+          market: option.market,
+          marketParam: option.marketParam,
+          pick: option.pick,
           stake: Number(input),
           currency: 'USDT',
         })
@@ -94,8 +98,8 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
             {match.teams.away.name}
           </span>
         </div>
-        <span className="text-black font-bold py-1 px-2 capitalize ring-4 ring-yellow-500 rounded-full bg-yellow-300 text-xs">
-          {selectedOption}
+        <span className="text-black font-bold py-1 px-2 ring-4 ring-yellow-500 rounded-full bg-yellow-300 text-xs whitespace-nowrap">
+          {option?.longLabel ?? selectedOption}
         </span>
       </div>
 

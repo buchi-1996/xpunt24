@@ -12,39 +12,75 @@ import { notificationService } from './notification.service'
 import { socketService } from './socket.service'
 import { env } from '../config/env'
 
+interface FixtureResult {
+  homeScore: number
+  awayScore: number
+  halftimeHome: number
+  halftimeAway: number
+}
+
 /**
  * Determines if the given pick wins based on match scores.
+ * marketParam carries threshold (e.g. "2.5") for OVER_UNDER variants.
  */
 export function determineOutcome(
   market: Market,
   pick: Pick,
-  homeScore: number,
-  awayScore: number,
+  fixture: FixtureResult,
+  marketParam?: string,
 ): boolean {
+  const { homeScore, awayScore, halftimeHome, halftimeAway } = fixture
   const total = homeScore + awayScore
+  const ht1H = halftimeHome
+  const ht1A = halftimeAway
+  const sh2H = homeScore - halftimeHome
+  const sh2A = awayScore - halftimeAway
+  const total1H = ht1H + ht1A
+  const threshold = marketParam ? parseFloat(marketParam) : 2.5
+
+  const winnerOutcome = (h: number, a: number): boolean => {
+    if (pick === Pick.HOME) return h > a
+    if (pick === Pick.AWAY) return a > h
+    if (pick === Pick.DRAW) return h === a
+    if (pick === Pick.DOUBLE_CHANCE) return h !== a // "no draw" counter-side
+    return false
+  }
+
+  const dcOutcome = (h: number, a: number): boolean => {
+    if (pick === Pick.HOME) return h >= a // 1X
+    if (pick === Pick.AWAY) return a >= h // X2
+    return false
+  }
+
+  const bttsOutcome = (h: number, a: number): boolean => {
+    if (pick === Pick.YES) return h > 0 && a > 0
+    if (pick === Pick.NO) return !(h > 0 && a > 0)
+    return false
+  }
+
+  const overUnderOutcome = (t: number): boolean => {
+    if (pick === Pick.OVER) return t > threshold
+    if (pick === Pick.UNDER) return t < threshold
+    return false
+  }
 
   switch (market) {
     case Market.MATCH_WINNER:
-      if (pick === Pick.HOME) return homeScore > awayScore
-      if (pick === Pick.AWAY) return awayScore > homeScore
-      if (pick === Pick.DRAW) return homeScore === awayScore
-      return false
-
-    case Market.BOTH_TEAMS_TO_SCORE:
-      if (pick === Pick.YES) return homeScore > 0 && awayScore > 0
-      if (pick === Pick.NO) return !(homeScore > 0 && awayScore > 0)
-      return false
-
-    case Market.OVER_UNDER:
-      if (pick === Pick.OVER) return total > 2.5
-      if (pick === Pick.UNDER) return total <= 2.5
-      return false
-
+      return winnerOutcome(homeScore, awayScore)
     case Market.DOUBLE_CHANCE:
-      if (pick === Pick.HOME) return homeScore >= awayScore
-      if (pick === Pick.AWAY) return awayScore >= homeScore
-      return false
-
+      return dcOutcome(homeScore, awayScore)
+    case Market.BOTH_TEAMS_TO_SCORE:
+      return bttsOutcome(homeScore, awayScore)
+    case Market.OVER_UNDER:
+      return overUnderOutcome(total)
+    case Market.FIRST_HALF_WINNER:
+      return winnerOutcome(ht1H, ht1A)
+    case Market.FIRST_HALF_BOTH_TEAMS_TO_SCORE:
+      return bttsOutcome(ht1H, ht1A)
+    case Market.FIRST_HALF_OVER_UNDER:
+      return overUnderOutcome(total1H)
+    case Market.SECOND_HALF_WINNER:
+      return winnerOutcome(sh2H, sh2A)
     default:
       return false
   }
@@ -65,10 +101,9 @@ class SettlementService {
     if (!challenge.opponentId) throw new AppError('Challenge has no opponent', 400)
 
     const fixture = await fixtureService.getCompletedFixture(challenge.fixtureId)
-    const { homeScore, awayScore } = fixture
 
     // Determine winner by checking creator's pick
-    const creatorWins = determineOutcome(challenge.market, challenge.pick, homeScore, awayScore)
+    const creatorWins = determineOutcome(challenge.market, challenge.pick, fixture, challenge.marketParam)
     const winnerId = creatorWins
       ? challenge.creatorId.toString()
       : challenge.opponentId.toString()
