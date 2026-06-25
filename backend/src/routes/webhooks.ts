@@ -63,8 +63,9 @@ router.post('/crypto/payram', async (req: Request, res: Response, next: NextFunc
       if (payload.tx_hash) deposit.txHash = payload.tx_hash
       await deposit.save()
 
-      // Credit the wallet — using requested amount to avoid overpay confusion
-      const creditAmount = parseFloat(deposit.requestedAmount.toString())
+      // Credit exactly what arrived on-chain — never the requested amount.
+      // Underpay → credit what they sent; overpay (OVER_FILLED) → credit the full received amount.
+      const creditAmount = receivedAmount
       await walletService.creditDeposit(userId, creditAmount, deposit._id.toString())
 
       deposit.status = 'CREDITED'
