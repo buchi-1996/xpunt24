@@ -63,6 +63,32 @@ router.post('/deposits', authenticate, async (req: Request, res: Response, next:
     const user = await User.findById(userId).select('email').lean()
     if (!user?.email) throw new AppError('User email required for deposit', 400)
 
+    // Fix: reuse an existing still-open deposit instead of creating a second PayRam request.
+    // PayRam reuses one deposit address per project, and creating a new request cancels the
+    // previous open one — funds then get misattributed to the wrong request (partial fill).
+    // Returning the existing open deposit (within PayRam's ~1h expiry window) avoids the collision.
+    const existing = await Deposit.findOne({
+      userId: new Types.ObjectId(userId),
+      status: 'PENDING_CONFIRMATION',
+      address: { $nin: ['pending', null] },
+      createdAt: { $gt: new Date(Date.now() - 55 * 60 * 1000) },
+    }).sort({ createdAt: -1 })
+
+    if (existing) {
+      res.status(200).json({
+        data: {
+          depositId: existing._id.toString(),
+          address: existing.address,
+          network: 'TRC20',
+          currency,
+          amount: String(parseFloat(existing.requestedAmount.toString())),
+          providerReference: existing.providerReference,
+          reused: true,
+        },
+      })
+      return
+    }
+
     // Create a placeholder deposit record first so we have an ID for the invoiceId
     const deposit = await Deposit.create({
       userId: new Types.ObjectId(userId),
