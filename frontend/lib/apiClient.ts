@@ -42,7 +42,7 @@ function del<T>(path: string) {
 
 export const api = {
   auth: {
-    me: () => get<{ user: { _id: string; name: string; email: string; image?: string; role: string } }>('/auth/me'),
+    me: () => get<{ user: { _id: string; name: string; email: string; image?: string; role: string; createdAt?: string } }>('/auth/me'),
     logout: () => post<void>('/auth/logout'),
   },
 
@@ -119,7 +119,7 @@ export const api = {
   users: {
     get: (id: string) => get<{ data: unknown }>(`/users/${id}`),
     updateMe: (body: { name?: string; image?: string }) => patch<{ data: unknown }>('/users/me', body),
-    stats: (id: string) => get<{ data: unknown }>(`/users/${id}/stats`),
+    stats: (id: string) => get<{ data: UserStats }>(`/users/${id}/stats`),
     settings: () => get<{ data: unknown }>('/users/me/settings'),
     updateSettings: (body: unknown) => patch<{ data: unknown }>('/users/me/settings', body),
     follow: (id: string) => post<{ data: unknown }>(`/users/${id}/follow`),
@@ -134,6 +134,24 @@ export const api = {
     markRead: (id: string) => patch<{ data: NotificationItem }>(`/notifications/${id}/read`),
     markAllRead: () => patch<{ success: boolean }>('/notifications/read-all'),
   },
+}
+
+export interface UserStats {
+  userId: string
+  totalWagers: number
+  wonWagers: number
+  lostWagers: number
+  voidedWagers: number
+  totalStaked: string
+  totalWon: string
+  totalLost: string
+  netPnl: string
+  winRate: number
+  longestWinStreak: number
+  longestLossStreak: number
+  currentStreak: number
+  createdAt: string
+  updatedAt: string
 }
 
 export interface PlatformLimits {

@@ -9,6 +9,7 @@ interface AuthUser {
   email: string
   image?: string
   role: string
+  createdAt?: string
 }
 
 interface AuthContextType {
@@ -27,7 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refresh() {
     try {
       const { user: u } = await api.auth.me()
-      setUser({ id: u._id, name: u.name, email: u.email, image: u.image, role: u.role })
+      setUser({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        image: u.image,
+        role: u.role,
+        createdAt: (u as { createdAt?: string }).createdAt,
+      })
     } catch {
       setUser(null)
     }

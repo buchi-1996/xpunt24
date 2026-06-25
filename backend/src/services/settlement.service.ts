@@ -219,8 +219,9 @@ class SettlementService {
     })
     session.endSession()
 
-    await this.updateUserStats(winnerId, true)
-    await this.updateUserStats(loserId, false)
+    const payoutNum = parseFloat(challenge.potentialWin.toString())
+    await this.updateUserStats(winnerId, true, stakeNum, payoutNum)
+    await this.updateUserStats(loserId, false, stakeNum, payoutNum)
 
     const isEarly = settledBy === 'AUTO_EARLY'
     const winnerTitle = isEarly ? 'Challenge Settled Early — You Won!' : 'Challenge Settled — You Won!'
@@ -418,7 +419,7 @@ class SettlementService {
     return { processed: matched.length, settledEarly }
   }
 
-  private async updateUserStats(userId: string, won: boolean) {
+  private async updateUserStats(userId: string, won: boolean, stake: number, payout: number) {
     const userObjectId = new Types.ObjectId(userId)
     let stats = await UserStats.findOne({ userId: userObjectId })
     if (!stats) {
@@ -429,6 +430,16 @@ class SettlementService {
     const wonWagers = stats.wonWagers + (won ? 1 : 0)
     const lostWagers = stats.lostWagers + (won ? 0 : 1)
     const winRate = totalWagers > 0 ? (wonWagers / totalWagers) * 100 : 0
+
+    // Monetary tracking — stake counts for both sides; payout counts only for the winner;
+    // stake counts as loss for the loser. netPnl = totalWon - totalLost.
+    const prevStaked = parseFloat(stats.totalStaked?.toString() ?? '0') || 0
+    const prevWon = parseFloat(stats.totalWon?.toString() ?? '0') || 0
+    const prevLost = parseFloat(stats.totalLost?.toString() ?? '0') || 0
+    const totalStaked = prevStaked + stake
+    const totalWon = prevWon + (won ? payout : 0)
+    const totalLost = prevLost + (won ? 0 : stake)
+    const netPnl = totalWon - totalLost
 
     let currentStreak = stats.currentStreak
     if (won) {
@@ -454,6 +465,10 @@ class SettlementService {
       currentStreak,
       longestWinStreak,
       longestLossStreak,
+      totalStaked: String(totalStaked),
+      totalWon: String(totalWon),
+      totalLost: String(totalLost),
+      netPnl: String(netPnl),
     })
   }
 }
