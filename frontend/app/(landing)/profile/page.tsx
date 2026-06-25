@@ -232,24 +232,22 @@ export default function ProfilePage() {
             sub="Open, active and settled bets"
           />
           <ActionRow
-            href="/wagers"
+            href="/transactions"
             Icon={HistoryIcon}
             label="Transactions"
             sub="Wallet ledger and history"
           />
           <ActionRow
-            href="#"
+            href="/notifications"
             Icon={BellIcon}
             label="Notifications"
-            sub="In-app and email preferences"
-            disabled
+            sub="In-app alerts and history"
           />
           <ActionRow
-            href="#"
+            href="/settings"
             Icon={SettingsIcon}
-            label="Account Settings"
-            sub="Coming soon"
-            disabled
+            label="Settings"
+            sub="Profile, notifications, privacy"
             last
           />
         </div>

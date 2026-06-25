@@ -50,7 +50,7 @@ export const api = {
     limits: () => get<{ data: PlatformLimits }>('/wallet/limits'),
     balance: () => get<{ data: { balance: string; lockedBalance: string; currency: string } }>('/wallet/balance'),
     transactions: (page?: number) =>
-      get<{ data: unknown[]; total: number; page: number; totalPages: number }>(
+      get<{ data: LedgerEntry[]; total: number; page: number; totalPages: number }>(
         `/wallet/transactions${page ? `?page=${page}` : ''}`,
       ),
     createDeposit: (body: { amount: number; currency?: string }) =>
@@ -120,8 +120,8 @@ export const api = {
     get: (id: string) => get<{ data: unknown }>(`/users/${id}`),
     updateMe: (body: { name?: string; image?: string }) => patch<{ data: unknown }>('/users/me', body),
     stats: (id: string) => get<{ data: UserStats }>(`/users/${id}/stats`),
-    settings: () => get<{ data: unknown }>('/users/me/settings'),
-    updateSettings: (body: unknown) => patch<{ data: unknown }>('/users/me/settings', body),
+    settings: () => get<{ data: UserSettingsDoc }>('/users/me/settings'),
+    updateSettings: (body: Partial<UserSettingsDoc>) => patch<{ data: UserSettingsDoc }>('/users/me/settings', body),
     follow: (id: string) => post<{ data: unknown }>(`/users/${id}/follow`),
     unfollow: (id: string) => del<{ success: boolean }>(`/users/${id}/follow`),
   },
@@ -150,6 +150,54 @@ export interface UserStats {
   longestWinStreak: number
   longestLossStreak: number
   currentStreak: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type LedgerEntryType =
+  | 'DEPOSIT'
+  | 'WITHDRAWAL'
+  | 'WITHDRAWAL_REVERSAL'
+  | 'WAGER_STAKE'
+  | 'WAGER_WIN'
+  | 'WAGER_REFUND'
+  | 'PLATFORM_FEE'
+  | 'ADMIN_CREDIT'
+  | 'ADMIN_DEBIT'
+
+export interface LedgerEntry {
+  _id: string
+  walletAccountId: string
+  userId: string
+  type: LedgerEntryType
+  amount: string
+  balanceBefore: string
+  balanceAfter: string
+  currency: string
+  sourceId: string
+  sourceModel: string
+  description?: string
+  metadata?: Record<string, unknown>
+  createdAt: string
+}
+
+export interface UserSettingsDoc {
+  _id: string
+  userId: string
+  notifications: {
+    challengeMatched: boolean
+    challengeSettled: boolean
+    depositConfirmed: boolean
+    withdrawalProcessed: boolean
+    newFollower: boolean
+  }
+  privacy: {
+    showWagerHistory: boolean
+    showStats: boolean
+    showBalance: boolean
+  }
+  theme: 'LIGHT' | 'DARK' | 'SYSTEM'
+  language: string
   createdAt: string
   updatedAt: string
 }
