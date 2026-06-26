@@ -125,7 +125,8 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
           onClick={handleCreateChallenge}
           type="button"
           variant="secondary"
-          className="py-6 font-bold sm:text-[1rem]"
+          disabled={isPending}
+          className="py-6 font-bold sm:text-[1rem] disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isPending ? <LoaderSpinner color="bg-white" /> : 'Create Challenge'}
         </Button>

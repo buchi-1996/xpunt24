@@ -106,3 +106,39 @@ export function findPickOption(id: string | undefined): PickOption | undefined {
   if (!id) return undefined
   return PICK_BY_ID.get(id)
 }
+
+// Resolve a stored challenge/wager (market, marketParam, pick) tuple back to its PickOption.
+// Challenges store the (market, marketParam, pick) the backend validated — identical whether
+// the challenge was created manually or paired by the auto-matcher — so this works for both.
+const tupleKey = (market?: string, marketParam?: string | null, pick?: string): string =>
+  `${market ?? ''}|${marketParam ?? ''}|${pick ?? ''}`
+
+export const PICK_BY_TUPLE: Map<string, PickOption> = new Map(
+  PICK_OPTIONS.map((p) => [tupleKey(p.market, p.marketParam, p.pick), p]),
+)
+
+export function findPickByTuple(
+  market?: string,
+  marketParam?: string | null,
+  pick?: string,
+): PickOption | undefined {
+  if (!market || !pick) return undefined
+  return PICK_BY_TUPLE.get(tupleKey(market, marketParam, pick))
+}
+
+// Card-friendly label: show the full pick text, but fall back to the standard short code
+// (e.g. "X2" for "Away or Draw", "GG" for "Both Teams Score") when the full text is too long
+// for the compact card. Falls back to a capitalized raw pick if the tuple is unknown.
+export function pickCardLabel(
+  market?: string,
+  marketParam?: string | null,
+  pick?: string,
+  maxLen = 10,
+): string {
+  const opt = findPickByTuple(market, marketParam, pick)
+  if (!opt) {
+    if (!pick) return 'N/A'
+    return pick.charAt(0) + pick.slice(1).toLowerCase()
+  }
+  return opt.longLabel.length <= maxLen ? opt.longLabel : opt.shortLabel
+}

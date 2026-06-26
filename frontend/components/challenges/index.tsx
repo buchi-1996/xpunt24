@@ -19,6 +19,8 @@ export interface ChallengeProps {
   _id: string
   matchData: unknown
   amount: number
+  market?: string
+  marketParam?: string | null
   challengerPick: string | null
   opposerPick: string | null
   challenger: {

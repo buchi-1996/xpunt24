@@ -7,11 +7,14 @@ import { useModal } from '@/hooks/useModal'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { format } from 'date-fns'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
+import { findPickByTuple, pickCardLabel } from '@/lib/picks'
 
 export interface BetCardProps {
   _id: string
   matchData: unknown
   amount: number
+  market?: string
+  marketParam?: string | null
   challengerPick: string | null
   opposerPick: string | null
   challenger?: {
@@ -50,9 +53,13 @@ function isValidMatchData(data: unknown): data is ExpectedMatchData {
   )
 }
 
-const BetCard = ({ _id, matchData, amount, challenger, challengerPick, opposerPick }: BetCardProps) => {
+const BetCard = ({ _id, matchData, amount, market, marketParam, challenger, challengerPick, opposerPick }: BetCardProps) => {
   const { openModal } = useModal()
   const requireAuth = useRequireAuth()
+  // Resolve the creator's pick (market, marketParam, pick) → human label. Show the full text,
+  // or the standard short code (X2, 1X, GG, O 2.5…) when it's too long for the card.
+  const pickLabel = pickCardLabel(market, marketParam, challengerPick ?? undefined)
+  const pickFull = findPickByTuple(market, marketParam, challengerPick ?? undefined)?.longLabel ?? pickLabel
   const challengerName = challenger?.name ?? challenger?.username ?? 'Anonymous'
   const challengerImage = challenger?.image ?? ''
   const avatarFallback =
@@ -98,8 +105,11 @@ const BetCard = ({ _id, matchData, amount, challenger, challengerPick, opposerPi
           <h4 className="text-xs font-bold text-center">{home.name || 'Home'}</h4>
         </div>
         <div className="col-span-3 flex flex-col items-center justify-center">
-          <span className="text-black mb-2 font-bold py-1 px-2 capitalize ring-4 ring-yellow-500 rounded-full bg-yellow-300 text-xs">
-            {challengerPick || 'N/A'}
+          <span
+            title={pickFull}
+            className="text-black mb-2 font-bold py-1 px-2 text-center ring-4 ring-yellow-500 rounded-full bg-yellow-300 text-xs whitespace-nowrap"
+          >
+            {pickLabel}
           </span>
           <h4 className="text-xl xl:text-2xl font-bold">{matchTime}</h4>
           <span className="text-xs text-gray-400">{matchDate}</span>
