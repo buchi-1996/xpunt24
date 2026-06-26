@@ -94,7 +94,10 @@ class WalletService {
       String(parseFloat(wallet.balance.toString()) - amountNum),
     )
 
-    const sourceId = `${challengeId}:${LedgerEntryType.WAGER_STAKE}`
+    // Per-user: creator AND opponent both lock stake on the SAME challengeId. Without userId
+    // the second locker collides on the unique {sourceId,type} ledger index, which aborts the
+    // whole transaction server-side and makes withTransaction retry forever (matching hung).
+    const sourceId = `${challengeId}:${userId}:${LedgerEntryType.WAGER_STAKE}`
     try {
       await createLedgerEntry(
         wallet,
@@ -145,7 +148,7 @@ class WalletService {
       String(parseFloat(wallet.balance.toString()) + amountNum),
     )
 
-    const sourceId = `${challengeId}:${LedgerEntryType.WAGER_REFUND}`
+    const sourceId = `${challengeId}:${userId}:${LedgerEntryType.WAGER_REFUND}`
     try {
       await createLedgerEntry(
         wallet,

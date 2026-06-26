@@ -143,27 +143,11 @@ class ChallengeService {
       throw new AppError(`Maximum stake is ${env.MAX_STAKE}`, 400, 'ABOVE_MAX_STAKE')
     }
 
-    // AUTO-MATCH: before creating a new OPEN challenge, look for an existing compatible counter-challenge.
-    // FIFO — the oldest OPEN challenge from another user, same fixture/market/stake/currency, opposite pick.
-    const counter = await this.findCompatibleOpenChallenge({
-      fixtureId,
-      market,
-      marketParam,
-      pick: opponentPick,
-      stake: stakeNum,
-      currency,
-      excludeUserId: userId,
-    })
-    if (counter) {
-      try {
-        const matched = await this.acceptChallenge(counter._id.toString(), userId)
-        return matched
-      } catch (err) {
-        // If someone else accepted it between findCompatible and acceptChallenge,
-        // fall through and create a new OPEN challenge as normal.
-        if (!(err instanceof AppError) || err.code !== 'NOT_OPEN') throw err
-      }
-    }
+    // Auto-matching is handled exclusively by the /cron/auto-match sweep (autoMatchSweep),
+    // NOT at create time. Doing it here made every create race the cron for the same
+    // wallet/challenge docs, which deadlocked on Atlas's transaction lifetime and hung the
+    // request ~2 min. Creating always produces a fast OPEN row; the cron pairs opposites
+    // within ~1 min, and users can still match instantly via the manual "Oppose" flow.
 
     const feePercent = env.PLATFORM_FEE_PERCENT
     const platformFee = (stakeNum * 2 * feePercent) / 100
@@ -195,7 +179,7 @@ class ChallengeService {
         expiresAt: effectiveExpiry,
       })
       await challenge.save({ session })
-    })
+    }, { maxCommitTimeMS: 10000 })
 
     session.endSession()
 
@@ -234,16 +218,24 @@ class ChallengeService {
     const stakeNum = parseFloat(challenge.stake.toString())
 
     const session = await mongoose.startSession()
-    await session.withTransaction(async () => {
-      await walletService.lockStake(opponentId, stakeNum, challengeId, session)
+    await session.withTransaction(
+      async () => {
+        // Atomically CLAIM the challenge first: only the accepter that flips OPEN→MATCHED
+        // proceeds. If create-time auto-match and the auto-match cron race for the same
+        // challenge, the loser gets null here and exits fast with NOT_OPEN instead of
+        // deadlocking on the wallet/challenge docs until the transaction times out.
+        const claimed = await Challenge.findOneAndUpdate(
+          { _id: challengeId, status: ChallengeStatus.OPEN },
+          { status: ChallengeStatus.MATCHED, opponentId: new Types.ObjectId(opponentId) },
+          { session, new: true },
+        )
+        if (!claimed) {
+          throw new AppError('Challenge is no longer open', 400, 'NOT_OPEN')
+        }
 
-      await Challenge.findByIdAndUpdate(
-        challengeId,
-        { status: ChallengeStatus.MATCHED, opponentId: new Types.ObjectId(opponentId) },
-        { session },
-      )
+        await walletService.lockStake(opponentId, stakeNum, challengeId, session)
 
-      // Activate both wagers
+        // Activate both wagers
       await Wager.updateMany(
         { challengeId: new Types.ObjectId(challengeId) },
         { status: WagerStatus.ACTIVE },
@@ -267,7 +259,11 @@ class ChallengeService {
         ],
         { session },
       )
-    })
+    },
+      // Bound the commit so a rare lock conflict fails in seconds instead of hanging on
+      // Atlas's 60s transaction lifetime (which surfaced as a 2-minute spinner).
+      { maxCommitTimeMS: 10000 },
+    )
     session.endSession()
 
     const updated = await Challenge.findById(challengeId).lean()
@@ -405,7 +401,25 @@ class ChallengeService {
   // Safety net: scan OPEN challenges for pairs that the create-time matcher missed (e.g. race conditions).
   // Pairs are merged by cancelling the newer one (refunding the user) then accepting the older — so
   // the secondary user's stake gets re-locked under the surviving challenge through the normal path.
+  // In-memory mutex: only one sweep runs at a time. Overlapping sweeps (a slow run still
+  // going when the next cron fires, or a manual trigger during the cron) deadlock — each
+  // multi-document merge transaction holds one challenge and waits for another. Single
+  // backend instance, so an in-process flag is sufficient.
+  private sweepRunning = false
+
   async autoMatchSweep() {
+    if (this.sweepRunning) {
+      return { processed: 0, matched: 0, skipped: true as const }
+    }
+    this.sweepRunning = true
+    try {
+      return await this.runAutoMatchSweep()
+    } finally {
+      this.sweepRunning = false
+    }
+  }
+
+  private async runAutoMatchSweep() {
     const openChallenges = await Challenge.find({ status: ChallengeStatus.OPEN })
       .sort({ createdAt: 1 })
       .lean<
@@ -440,22 +454,80 @@ class ChallengeService {
       })
       if (!counter || seen.has(counter._id.toString())) continue
 
-      // FIFO: oldest survives, newer one is cancelled + re-accepted under the older
+      // FIFO: oldest survives as the matched challenge; the newer one is merged into it.
       const primary = counter.createdAt <= challenge.createdAt ? counter : challenge
       const secondary = primary === counter ? challenge : counter
+      // Both sides of a matched pair share the same stake; read it from the typed loop var.
+      const stakeNum = parseFloat(challenge.stake.toString())
 
+      // Merge the pair in ONE atomic transaction. The previous cancel-then-accept used two
+      // separate transactions, so a failure between them left a challenge cancelled-but-
+      // unmatched. Doing both claims + the stake move + the wagers together is all-or-nothing.
+      const session = await mongoose.startSession()
       try {
-        await this.cancelChallenge(secondary._id.toString(), secondary.creatorId.toString())
-        await this.acceptChallenge(primary._id.toString(), secondary.creatorId.toString())
+        await session.withTransaction(
+          async () => {
+            const p = await Challenge.findOneAndUpdate(
+              { _id: primary._id, status: ChallengeStatus.OPEN },
+              { status: ChallengeStatus.MATCHED, opponentId: secondary.creatorId },
+              { session, new: true },
+            )
+            if (!p) throw new AppError('Primary no longer open', 409, 'NOT_OPEN')
+            const s = await Challenge.findOneAndUpdate(
+              { _id: secondary._id, status: ChallengeStatus.OPEN },
+              { status: ChallengeStatus.CANCELLED },
+              { session, new: true },
+            )
+            if (!s) throw new AppError('Secondary no longer open', 409, 'NOT_OPEN')
+
+            // Move the secondary creator's stake off their (now cancelled) challenge and lock
+            // it onto the primary instead — net zero balance change, clean ledger trail.
+            await walletService.unlockStake(
+              secondary.creatorId.toString(), stakeNum, secondary._id.toString(), session,
+            )
+            await walletService.lockStake(
+              secondary.creatorId.toString(), stakeNum, primary._id.toString(), session,
+            )
+
+            await Wager.updateMany({ challengeId: p._id }, { status: WagerStatus.ACTIVE }, { session })
+            await Wager.updateMany({ challengeId: s._id }, { status: WagerStatus.CANCELLED }, { session })
+            await Wager.create(
+              [
+                {
+                  challengeId: p._id,
+                  userId: secondary.creatorId,
+                  pick: p.opponentPick,
+                  market: p.market,
+                  marketParam: p.marketParam,
+                  stake: p.stake,
+                  currency: p.currency,
+                  potentialPayout: p.potentialWin,
+                  status: WagerStatus.ACTIVE,
+                },
+              ],
+              { session },
+            )
+          },
+          { maxCommitTimeMS: 10000 },
+        )
+
         seen.add(primary._id.toString())
         seen.add(secondary._id.toString())
         matched++
+
+        const primaryCreator = primary.creatorId.toString()
+        const secondaryCreator = secondary.creatorId.toString()
+        socketService.emitToUser(primaryCreator, SocketEvent.CHALLENGE_MATCHED, { challengeId: primary._id.toString() })
+        socketService.emitToUser(secondaryCreator, SocketEvent.CHALLENGE_MATCHED, { challengeId: primary._id.toString() })
+        socketService.emitToUser(secondaryCreator, SocketEvent.WALLET_BALANCE_UPDATED, { userId: secondaryCreator })
       } catch (err) {
         console.error('autoMatchSweep: failed to merge pair', {
           primary: primary._id.toString(),
           secondary: secondary._id.toString(),
           err,
         })
+      } finally {
+        await session.endSession()
       }
     }
 
