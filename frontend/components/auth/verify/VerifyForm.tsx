@@ -125,7 +125,7 @@ const VerifyFormInner = () => {
     <FormCard
       className="w-full shadow-xl max-w-[500px] border-0 flex flex-col items-center justify-center"
       title="Check your inbox"
-      label="We've sent you a verification link"
+      label="One more step to finish signing up"
       backButtonHref="/auth/login"
       backButtonLabel="Back to sign in"
     >
@@ -133,8 +133,12 @@ const VerifyFormInner = () => {
         <MailIcon className="h-10 w-10 text-blue-600 mb-3" />
         <p className="text-sm text-gray-600 text-center">
           We've sent a verification link to <strong>{email || 'your email'}</strong>.
-          Click it to finish setting up your account.
+          Click it to finish creating your account.
         </p>
+        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 w-full">
+          <strong>Your account isn't active yet.</strong> Trying to sign in before verifying
+          will fail — click the link in your email first.
+        </div>
       </div>
       <div className="space-y-3 w-full mt-4">
         <Input

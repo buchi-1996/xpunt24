@@ -162,6 +162,23 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
   }
 })
 
+// POST /auth/logout-everywhere — invalidate every JWT for this user across all devices.
+// Also clears the current device's cookie. Useful when a device is lost or you suspect
+// your session was compromised.
+router.post('/logout-everywhere', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await authService.logoutEverywhere(req.user!.id)
+    const base = authClearCookieOptions()
+    if (env.COOKIE_DOMAIN) res.clearCookie(AUTH_COOKIE_NAME, base)
+    const { domain: _omit, ...hostOnly } = base
+    void _omit
+    res.clearCookie(AUTH_COOKIE_NAME, hostOnly)
+    res.json({ message: 'Signed out everywhere' })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // POST /auth/logout — clear auth cookie.
 // IMPORTANT: clearCookie options MUST match what was set, or the browser won't recognize
 // the directive and the cookie persists. Same httpOnly / secure / sameSite / domain as set.

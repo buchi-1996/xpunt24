@@ -1,5 +1,16 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
+// Paths the global 401 handler should NOT trigger logout on — these endpoints' 401s are
+// expected (login failures, /auth/me on a logged-out visitor) and we don't want them to
+// bounce the user to the login page.
+const SKIP_401_PATHS = ['/auth/login', '/auth/me', '/auth/register', '/auth/verify-email', '/auth/reset-password']
+
+type GlobalUnauthorizedHandler = () => void
+let onUnauthorized: GlobalUnauthorizedHandler | null = null
+export function setUnauthorizedHandler(fn: GlobalUnauthorizedHandler | null) {
+  onUnauthorized = fn
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -10,14 +21,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   })
 
-  
-
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
-    const err = new Error((body as { error?: string }).error ?? res.statusText) as Error & {
+    const parsed = body as { error?: string; code?: string }
+    const err = new Error(parsed.error ?? res.statusText) as Error & {
       status: number
+      code?: string
     }
     err.status = res.status
+    if (parsed.code) err.code = parsed.code
+
+    // Global 401 handling: a previously-valid session has gone invalid (idle timeout,
+    // session-invalidated, JWT expired). Bump the user out everywhere and route to login.
+    // Skip on endpoints where 401 is part of normal flow.
+    if (res.status === 401 && onUnauthorized && !SKIP_401_PATHS.some((p) => path.startsWith(p))) {
+      onUnauthorized()
+    }
+
     throw err
   }
 
@@ -55,6 +75,7 @@ export const api = {
   auth: {
     me: () => get<{ user: AuthUser }>('/auth/me'),
     logout: () => post<void>('/auth/logout'),
+    logoutEverywhere: () => post<{ message: string }>('/auth/logout-everywhere'),
     register: (body: { name: string; email: string; password: string }) =>
       post<{ message: string }>('/auth/register', body),
     login: (body: { email: string; password: string }) =>

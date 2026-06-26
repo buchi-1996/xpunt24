@@ -188,26 +188,61 @@ class AuthService {
     const email = params.email.trim().toLowerCase()
     const user = await User.findOne({ email }).select('+passwordHash')
 
-    // Generic-fail branch (covers no-user, no-password-on-account, wrong-password)
-    if (!user || !user.passwordHash) {
-      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
+    // Happy path: user exists with passwordHash → verify and issue JWT
+    if (user && user.passwordHash) {
+      const ok = await verifyPassword(params.password, user.passwordHash)
+      if (ok) {
+        if (
+          user.accountStatus === AccountStatus.BANNED ||
+          user.accountStatus === AccountStatus.CLOSED ||
+          user.accountStatus === AccountStatus.SUSPENDED
+        ) {
+          throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
+        }
+        // We DO allow login when emailVerified is null — money actions are gated by
+        // requireVerifiedEmail middleware; the UI shows a banner. Agreed UX.
+        const token = issueToken(user._id.toString(), user.role, user.accountStatus)
+        return { token, user }
+      }
     }
-    const ok = await verifyPassword(params.password, user.passwordHash)
-    if (!ok) throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
 
-    // Account-status gate (don't leak which status to anonymous probers)
-    if (
-      user.accountStatus === AccountStatus.BANNED ||
-      user.accountStatus === AccountStatus.CLOSED ||
-      user.accountStatus === AccountStatus.SUSPENDED
-    ) {
-      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
+    // Pre-verify path: someone just registered and is trying to log in before clicking the
+    // email link. If the password matches a staged token (either pendingEmail-keyed for new
+    // signups, or userId-keyed for linking), give them a specific actionable error.
+    // Only leaks "this account is pending verification" to the holder of the correct
+    // password — which is fine, since they just set it themselves at registration.
+    if (await this.matchesPendingRegistration(email, params.password, user?._id)) {
+      throw new AppError(
+        'Please check your email and click the verification link to finish signing up.',
+        403,
+        'EMAIL_NOT_VERIFIED_PENDING',
+      )
     }
 
-    // We DO allow login when emailVerified is null — backend gates money actions via
-    // requireVerifiedEmail middleware; the UI shows a banner. This is the agreed UX.
-    const token = issueToken(user._id.toString(), user.role, user.accountStatus)
-    return { token, user }
+    throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS')
+  }
+
+  private async matchesPendingRegistration(
+    email: string,
+    plaintextPassword: string,
+    userId?: Types.ObjectId,
+  ): Promise<boolean> {
+    const now = new Date()
+    const query: Record<string, unknown> = {
+      purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+      usedAt: null,
+      expiresAt: { $gt: now },
+    }
+    if (userId) {
+      // Linking case — staged hash sits on a token bound to the existing user record
+      query['userId'] = userId
+    } else {
+      // Brand-new-user case — staged hash sits on a token with pendingEmail
+      query['pendingEmail'] = email
+    }
+    const pending = await VerificationToken.findOne(query).select('+pendingPasswordHash')
+    if (!pending?.pendingPasswordHash) return false
+    return verifyPassword(plaintextPassword, pending.pendingPasswordHash)
   }
 
   /**
@@ -346,6 +381,10 @@ class AuthService {
         passwordHash,
         // A successful reset proves email control — verify them implicitly.
         emailVerified: new Date(),
+        // Invalidate every existing session. Set 2s in the past so the auto-login JWT
+        // we issue immediately below (with iat ≈ now) is not accidentally rejected by
+        // its own check. Any JWT issued more than 2s before this moment will fail.
+        sessionsValidFrom: new Date(Date.now() - 2000),
       },
     })
 
@@ -362,6 +401,16 @@ class AuthService {
 
     const token = issueToken(user._id.toString(), user.role, user.accountStatus)
     return { token, user }
+  }
+
+  /**
+   * Invalidate every JWT for this user. The current device's cookie is cleared by the
+   * route handler. Other devices' JWTs will fail the next authenticate() check.
+   */
+  async logoutEverywhere(userId: string): Promise<void> {
+    await User.findByIdAndUpdate(userId, {
+      $set: { sessionsValidFrom: new Date(Date.now() - 2000) },
+    })
   }
 
   // ───── helpers ─────

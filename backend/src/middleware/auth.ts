@@ -18,7 +18,11 @@ declare global {
   }
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction): void {
+export async function authenticate(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   let token: string | undefined
 
   // Prefer httpOnly cookie, fall back to Authorization header
@@ -36,16 +40,48 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     return
   }
 
+  let payload: jwt.JwtPayload
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload
-    req.user = {
-      id: payload['sub'] as string,
-      role: payload['role'] as UserRole,
-      accountStatus: payload['accountStatus'] as AccountStatus,
-    }
-    next()
+    payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' })
+    return
+  }
+
+  const userId = payload['sub'] as string | undefined
+  if (!userId) {
+    res.status(401).json({ error: 'Invalid or expired token' })
+    return
+  }
+
+  // Session-invalidation check. If `sessionsValidFrom` has been bumped (manual sign-out-
+  // everywhere, password reset, admin suspend) any JWT issued before that timestamp is
+  // rejected. This is what makes logout "global" and password reset session-invalidating.
+  try {
+    const user = await User.findById(userId)
+      .select('sessionsValidFrom accountStatus role')
+      .lean()
+    if (!user) {
+      res.status(401).json({ error: 'Invalid or expired token' })
+      return
+    }
+    if (user.sessionsValidFrom && typeof payload.iat === 'number') {
+      // payload.iat is seconds-since-epoch; sessionsValidFrom is a Date.
+      if (payload.iat * 1000 < user.sessionsValidFrom.getTime()) {
+        res.status(401).json({ error: 'Session has been invalidated', code: 'SESSION_INVALIDATED' })
+        return
+      }
+    }
+
+    req.user = {
+      id: userId,
+      // Prefer fresh DB values over the JWT payload — keeps role/status changes immediate.
+      role: user.role,
+      accountStatus: user.accountStatus,
+    }
+    next()
+  } catch (err) {
+    next(err)
   }
 }
 

@@ -34,8 +34,16 @@ const LoginFormInner = () => {
       await refresh()
       router.replace(redirect ?? '/')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Sign in failed'
-      toast.error(msg)
+      // If the email matches a pending registration AND the password matches, the backend
+      // returns 403 EMAIL_NOT_VERIFIED_PENDING — bounce them to the verify page with their
+      // email pre-filled instead of just showing "invalid credentials".
+      const e = err as { code?: string; message?: string }
+      if (e?.code === 'EMAIL_NOT_VERIFIED_PENDING') {
+        toast.info('Please verify your email to finish signing up.')
+        router.replace(`/auth/verify?email=${encodeURIComponent(values.email)}`)
+        return
+      }
+      toast.error(e?.message ?? 'Sign in failed')
     } finally {
       setSubmitting(false)
     }

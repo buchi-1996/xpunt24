@@ -11,6 +11,10 @@ export interface IUserDocument extends Document {
   accountStatus: AccountStatus
   googleId?: string
   passwordHash?: string
+  // Floor for accepted JWT issuance dates. Bumped to invalidate every active session at
+  // once (manual "sign out everywhere", password reset, admin suspend). authenticate
+  // middleware rejects JWTs whose iat is older than this timestamp.
+  sessionsValidFrom?: Date
   riskFlags: {
     highDepositVelocity: boolean
     suspiciousActivity: boolean
@@ -39,6 +43,7 @@ const userSchema = new Schema<IUserDocument>(
     // select: false so /auth/me, admin endpoints, and any leaky .lean() never expose the hash.
     // Routes that need it (login) must explicitly .select('+passwordHash').
     passwordHash: { type: String, select: false },
+    sessionsValidFrom: { type: Date },
     riskFlags: {
       highDepositVelocity: { type: Boolean, default: false },
       suspiciousActivity: { type: Boolean, default: false },

@@ -10,6 +10,7 @@ import {
   EyeOffIcon,
   LogOutIcon,
   MailIcon,
+  MonitorOffIcon,
   SaveIcon,
   ShieldIcon,
   UserIcon,
@@ -238,17 +239,40 @@ export default function SettingsPage() {
 
         {/* Account actions */}
         <SectionCard Icon={LogOutIcon} title="Account" subtitle="Sign out or destructive actions">
-          <div className="grid gap-2">
+          <div className="grid gap-1">
             <Button
               variant="ghost"
-              className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="justify-start text-gray-700 hover:bg-gray-50"
               onClick={async () => {
                 await logout()
                 window.location.href = '/'
               }}
             >
               <LogOutIcon className="h-4 w-4 mr-2" />
-              Sign out
+              Sign out (this device only)
+            </Button>
+            <Button
+              variant="ghost"
+              className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={async () => {
+                if (
+                  !confirm(
+                    'Sign out everywhere will invalidate every active session — your phone, ' +
+                    'tablet, and any browser you’re signed in on. Continue?',
+                  )
+                ) {
+                  return
+                }
+                try {
+                  await api.auth.logoutEverywhere()
+                } catch {
+                  // ignore — we'll force-clear locally regardless
+                }
+                window.location.href = '/'
+              }}
+            >
+              <MonitorOffIcon className="h-4 w-4 mr-2" />
+              Sign out everywhere
             </Button>
           </div>
         </SectionCard>
