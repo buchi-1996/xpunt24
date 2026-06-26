@@ -1,7 +1,5 @@
-import { redirect } from 'next/navigation'
+import VerifyForm from '@/components/auth/verify/VerifyForm'
 
-const Verify = async () => {
-  return redirect('/auth/login')
-}
+const Verify = () => <VerifyForm />
 
 export default Verify
