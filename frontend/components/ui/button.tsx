@@ -68,17 +68,23 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+        // Default is now the brand gradient — any <Button> without an explicit non-default
+        // variant inherits it automatically (the old near-black `bg-primary` look is gone).
+        default:
+          "bg-btn-bg text-white shadow-lg hover:scale-105 transition-all duration-300 ease-in-out",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
           "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        // White CTA used on dark hero backdrops.
         primary:
-          "bg-white text-black shadow-lg hover:bg-white hover:scale-105 transition-all duration-300 ease-in-out", // Primary variant
+          "bg-white text-black shadow-lg hover:bg-white hover:scale-105 transition-all duration-300 ease-in-out",
+        // Kept as an alias of default — many existing pages still pass variant="secondary"
+        // explicitly; both render the gradient.
         secondary:
-          "bg-btn-bg text-white shadow-lg hover:scale-105 transition-all duration-300 ease-in-out", // Secondary variant with gradient
+          "bg-btn-bg text-white shadow-lg hover:scale-105 transition-all duration-300 ease-in-out",
       },
       size: {
         default: "h-9 px-4 py-2",
