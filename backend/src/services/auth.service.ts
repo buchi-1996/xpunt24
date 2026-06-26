@@ -316,22 +316,61 @@ class AuthService {
   async resendVerification(email: string): Promise<void> {
     const normalized = email.trim().toLowerCase()
     const user = await User.findOne({ email: normalized }).select('+passwordHash')
-    if (!user || user.emailVerified) return // generic ack — caller never knows
-    if (await this.recentlySent({ userId: user._id, purpose: VerificationTokenPurpose.EMAIL_VERIFY })) return
 
-    await this.invalidateUserTokens(user._id, VerificationTokenPurpose.EMAIL_VERIFY)
+    // Case 1: an unverified User row exists → reissue a user-bound token.
+    if (user) {
+      if (user.emailVerified) return // already verified — nothing to do
+      if (await this.recentlySent({ userId: user._id, purpose: VerificationTokenPurpose.EMAIL_VERIFY })) return
+      await this.invalidateUserTokens(user._id, VerificationTokenPurpose.EMAIL_VERIFY)
+      const { plaintext, hash } = makeToken()
+      await VerificationToken.create({
+        userId: user._id,
+        tokenHash: hash,
+        purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+        expiresAt: verifyTokenExpiry(),
+      })
+      const msg = verifyEmailTemplate({
+        name: user.name,
+        link: buildVerifyLink(plaintext),
+        ttlHours: env.EMAIL_VERIFY_TTL_HOURS,
+        context: user.googleId && !user.passwordHash ? 'linking_to_google' : 'new_user',
+      })
+      await emailService.send({ ...msg, to: normalized })
+      return
+    }
+
+    // Case 2: brand-new signup staged as a token with no User row yet (register Branch A).
+    // Reissue a fresh token carrying the staged signup data so the link works.
+    if (await this.recentlySent({ email: normalized, purpose: VerificationTokenPurpose.EMAIL_VERIFY })) return
+    const staged = await VerificationToken.findOne({
+      purpose: VerificationTokenPurpose.EMAIL_VERIFY,
+      pendingEmail: normalized,
+      usedAt: null,
+      expiresAt: { $gt: new Date() },
+    })
+      .select('+pendingPasswordHash')
+      .sort({ createdAt: -1 })
+    if (!staged?.pendingPasswordHash || !staged.pendingName) return // nothing staged — generic ack
+
+    // Invalidate prior staged tokens for this email so only the newest link is live.
+    await VerificationToken.updateMany(
+      { purpose: VerificationTokenPurpose.EMAIL_VERIFY, pendingEmail: normalized, usedAt: null },
+      { $set: { usedAt: new Date() } },
+    )
     const { plaintext, hash } = makeToken()
     await VerificationToken.create({
-      userId: user._id,
       tokenHash: hash,
       purpose: VerificationTokenPurpose.EMAIL_VERIFY,
       expiresAt: verifyTokenExpiry(),
+      pendingEmail: normalized,
+      pendingName: staged.pendingName,
+      pendingPasswordHash: staged.pendingPasswordHash,
     })
     const msg = verifyEmailTemplate({
-      name: user.name,
+      name: staged.pendingName,
       link: buildVerifyLink(plaintext),
       ttlHours: env.EMAIL_VERIFY_TTL_HOURS,
-      context: user.googleId && !user.passwordHash ? 'linking_to_google' : 'new_user',
+      context: 'new_user',
     })
     await emailService.send({ ...msg, to: normalized })
   }
