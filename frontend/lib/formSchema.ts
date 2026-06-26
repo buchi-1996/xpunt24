@@ -38,7 +38,19 @@ export const resetSchema = z
     message: 'Passwords do not match',
   })
 
+// Legacy prototype schema kept around because `app/(landing)/dashboard/page.tsx` still
+// imports it. The real account UI lives in /profile + /settings now; this can be deleted
+// once that page is removed.
+export const updateProfileSchema = z.object({
+  username: z.string().min(2).max(50),
+  email: z.string().email(),
+  gender: z.enum(['Male', 'Female']),
+  bio: z.string().max(160),
+  avatar: z.string(),
+})
+
 export type RegisterValues = z.infer<typeof registerSchema>
 export type LoginValues = z.infer<typeof loginSchema>
 export type RequestResetValues = z.infer<typeof requestResetSchema>
 export type ResetValues = z.infer<typeof resetSchema>
+export type UpdateProfileValues = z.infer<typeof updateProfileSchema>
