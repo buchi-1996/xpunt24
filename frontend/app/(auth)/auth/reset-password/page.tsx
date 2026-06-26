@@ -1,9 +1,5 @@
-import React from 'react'
+import ResetPasswordForm from '@/components/auth/reset-password/ResetPasswordForm'
 
-const ResetPassword = () => {
-  return (
-    <div>ResetPassword</div>
-  )
-}
+const ResetPassword = () => <ResetPasswordForm />
 
 export default ResetPassword

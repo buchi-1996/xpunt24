@@ -1,44 +1,44 @@
-"use client"
+'use client'
 
-import { z } from "zod"
+import { z } from 'zod'
+
+// Keep client and server password rules in lockstep: min 10, max 128.
+const passwordField = z
+  .string()
+  .min(10, { message: 'Password must be at least 10 characters' })
+  .max(128, { message: 'Password is too long' })
+
+const emailField = z.string().email({ message: 'Please enter a valid email address' })
 
 export const registerSchema = z.object({
-  username: z.string().min(2, {
-    message: "Username must be atleast 2 characters."
-  }).max(50),
-  email: z.string().email({
-    message: "Please enter a valid email address"
-  }),
-  password: z.string().min(6, {
-    message: "Password must be atleast 6 characters."
-  })
+  name: z
+    .string()
+    .min(2, { message: 'Name must be at least 2 characters' })
+    .max(80, { message: 'Name is too long' }),
+  email: emailField,
+  password: passwordField,
 })
-
 
 export const loginSchema = z.object({
-  username: z.string().min(2, {
-    message: "Username must be atleast 2 characters."
-  }).max(50),
-  password: z.string().min(6, {
-    message: "Password must be atleast 6 characters."
-  })
+  email: emailField,
+  password: z.string().min(1, { message: 'Enter your password' }).max(128),
 })
 
-export const updateProfileSchema = z.object({
-  username: z.string().min(2, {
-    message: "Username must be atleast 2 characters."
-  }).max(50),
-  email: z.string().email({
-    message: "Please enter a valid email address"
-  }),
-  gender: z.enum(["Male", "Female"], {
-    message: "Invalid gender selection"
-  }),
-  bio: z.string().max(160, {
-    message: "Bio must be less than 160 characters."
-  }),
-  avatar: z.string().url({
-    message: "Please enter a valid URL"
-  })
+export const requestResetSchema = z.object({
+  email: emailField,
 })
 
+export const resetSchema = z
+  .object({
+    password: passwordField,
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords do not match',
+  })
+
+export type RegisterValues = z.infer<typeof registerSchema>
+export type LoginValues = z.infer<typeof loginSchema>
+export type RequestResetValues = z.infer<typeof requestResetSchema>
+export type ResetValues = z.infer<typeof resetSchema>

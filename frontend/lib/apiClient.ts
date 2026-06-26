@@ -40,10 +40,33 @@ function del<T>(path: string) {
   return request<T>(path, { method: 'DELETE' })
 }
 
+export interface AuthUser {
+  _id: string
+  name: string
+  email: string
+  image?: string
+  role: string
+  accountStatus?: string
+  emailVerified?: string | null
+  createdAt?: string
+}
+
 export const api = {
   auth: {
-    me: () => get<{ user: { _id: string; name: string; email: string; image?: string; role: string; createdAt?: string } }>('/auth/me'),
+    me: () => get<{ user: AuthUser }>('/auth/me'),
     logout: () => post<void>('/auth/logout'),
+    register: (body: { name: string; email: string; password: string }) =>
+      post<{ message: string }>('/auth/register', body),
+    login: (body: { email: string; password: string }) =>
+      post<{ user: AuthUser }>('/auth/login', body),
+    verifyEmail: (token: string) =>
+      post<{ user: AuthUser; message: string }>('/auth/verify-email', { token }),
+    resendVerification: (email: string) =>
+      post<{ message: string }>('/auth/resend-verification', { email }),
+    requestPasswordReset: (email: string) =>
+      post<{ message: string }>('/auth/request-password-reset', { email }),
+    resetPassword: (token: string, newPassword: string) =>
+      post<{ user: AuthUser; message: string }>('/auth/reset-password', { token, newPassword }),
   },
 
   wallet: {

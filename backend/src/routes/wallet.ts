@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { Types } from 'mongoose'
-import { authenticate } from '../middleware/auth'
+import { authenticate, requireVerifiedEmail } from '../middleware/auth'
 import { walletService } from '../services/wallet.service'
 import { socketService } from '../services/socket.service'
 import { notificationService } from '../services/notification.service'
@@ -53,7 +53,7 @@ router.get('/deposits/:id', authenticate, async (req: Request, res: Response, ne
 })
 
 // POST /wallet/deposits — create PayRam deposit intent, returns TRC20 address
-router.post('/deposits', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/deposits', authenticate, requireVerifiedEmail, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { amount, currency = 'USDT' } = req.body as { amount: number; currency?: string }
     if (!amount || amount <= 0) throw new AppError('Invalid amount', 400)
@@ -178,7 +178,7 @@ router.get('/withdrawals', authenticate, async (req: Request, res: Response, nex
   }
 })
 
-router.post('/withdraw', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/withdraw', authenticate, requireVerifiedEmail, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { amount, currency = 'USDT', destinationAddress } = req.body as {
       amount: number

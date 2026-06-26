@@ -6,6 +6,7 @@ import Footer from "@/components/footer/Footer";
 import Providers from "@/context/Providers";
 import HeaderSwitcher from "@/components/header/HeaderSwitcher";
 import BottomNav from "@/components/bottomNav";
+import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 
 // const geistSans = Geist({
 //   variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default function LandingLayout({
       >
         <Providers>
           <HeaderSwitcher />
+          <UnverifiedEmailBanner />
           {children}
           <BottomNav />
           <Footer />

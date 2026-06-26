@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express'
-import { authenticate } from '../middleware/auth'
+import { authenticate, requireVerifiedEmail } from '../middleware/auth'
 import { challengeService } from '../services/challenge.service'
 import { Market, Pick, ChallengeVisibility } from '@challengers-bet/shared'
 
@@ -15,7 +15,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 })
 
-router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', authenticate, requireVerifiedEmail, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { fixtureId, market, marketParam, pick, stake, currency, visibility, expiresAt } = req.body as {
       fixtureId: string
@@ -65,7 +65,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
   }
 })
 
-router.post('/:id/accept', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/accept', authenticate, requireVerifiedEmail, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const challenge = await challengeService.acceptChallenge(String(req.params['id']), req.user!.id)
     res.json({ data: challenge })

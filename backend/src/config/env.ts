@@ -23,6 +23,23 @@ const envSchema = z.object({
   // Optional. Set to e.g. `.xpunt24.com` in production so the auth cookie is visible to
   // both api.xpunt24.com (backend) and xpunt24.com (frontend). Leave unset in dev.
   COOKIE_DOMAIN: z.string().optional(),
+
+  // Email + frontend link config
+  EMAIL_FROM: z.string().email().default('noreply@xpunt24.local'),
+  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+
+  // Email provider (one of these must be configured in production)
+  RESEND_API_KEY: z.string().min(1).optional(),
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  SMTP_SECURE: z.coerce.boolean().optional(),
+
+  // Password + token policy
+  PASSWORD_HASH_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
+  EMAIL_VERIFY_TTL_HOURS: z.coerce.number().int().positive().default(24),
+  PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(60),
 })
 
 const parsed = envSchema.safeParse(process.env)

@@ -10,6 +10,7 @@ interface AuthUser {
   image?: string
   role: string
   createdAt?: string
+  emailVerified?: string | null
 }
 
 interface AuthContextType {
@@ -34,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: u.email,
         image: u.image,
         role: u.role,
-        createdAt: (u as { createdAt?: string }).createdAt,
+        createdAt: u.createdAt,
+        emailVerified: u.emailVerified ?? null,
       })
     } catch {
       setUser(null)

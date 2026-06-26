@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env'
 import { UserRole, AccountStatus } from '@challengers-bet/shared'
+import { User } from '../db/models/user.model'
 
 export interface AuthPayload {
   id: string
@@ -45,5 +46,38 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     next()
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' })
+  }
+}
+
+/**
+ * Blocks the request when the authenticated user hasn't verified their email yet.
+ * Mount AFTER `authenticate`. Use on money-touching routes (create/accept challenge,
+ * deposit, withdraw). Read-only routes (e.g. /auth/me) stay open so the UI can show
+ * the "please verify" banner.
+ */
+export async function requireVerifiedEmail(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' })
+    return
+  }
+  try {
+    const user = await User.findById(req.user.id).select('emailVerified').lean()
+    if (!user) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+    if (!user.emailVerified) {
+      res
+        .status(403)
+        .json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED' })
+      return
+    }
+    next()
+  } catch (err) {
+    next(err)
   }
 }

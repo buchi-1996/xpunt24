@@ -10,6 +10,7 @@ export interface IUserDocument extends Document {
   role: UserRole
   accountStatus: AccountStatus
   googleId?: string
+  passwordHash?: string
   riskFlags: {
     highDepositVelocity: boolean
     suspiciousActivity: boolean
@@ -35,6 +36,9 @@ const userSchema = new Schema<IUserDocument>(
       default: AccountStatus.ACTIVE,
     },
     googleId: { type: String, sparse: true, unique: true },
+    // select: false so /auth/me, admin endpoints, and any leaky .lean() never expose the hash.
+    // Routes that need it (login) must explicitly .select('+passwordHash').
+    passwordHash: { type: String, select: false },
     riskFlags: {
       highDepositVelocity: { type: Boolean, default: false },
       suspiciousActivity: { type: Boolean, default: false },

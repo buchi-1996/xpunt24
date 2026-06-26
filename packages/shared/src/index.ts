@@ -5,6 +5,7 @@ export * from './enums/wager'
 export * from './enums/ledger'
 export * from './enums/user'
 export * from './enums/socket'
+export * from './enums/auth'
 
 // Types
 export * from './types/fixture'
