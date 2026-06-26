@@ -30,6 +30,9 @@ import cronRouter from './routes/cron'
 import webhooksRouter from './routes/webhooks'
 
 const app = express()
+// Behind nginx — trust the first proxy hop so req.ip / X-Forwarded-For reflect the real
+// client IP. Without this, express-rate-limit buckets every user under the proxy IP.
+app.set('trust proxy', 1)
 const httpServer = createServer(app)
 
 const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())

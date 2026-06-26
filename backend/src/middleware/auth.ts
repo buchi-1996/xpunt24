@@ -73,6 +73,17 @@ export async function authenticate(
       }
     }
 
+    // Reject inactive accounts immediately, even with an otherwise-valid JWT — so an admin
+    // ban/suspend/close takes effect on the next request without waiting for token expiry.
+    if (
+      user.accountStatus === AccountStatus.BANNED ||
+      user.accountStatus === AccountStatus.CLOSED ||
+      user.accountStatus === AccountStatus.SUSPENDED
+    ) {
+      res.status(403).json({ error: 'Account is not active', code: 'ACCOUNT_INACTIVE' })
+      return
+    }
+
     req.user = {
       id: userId,
       // Prefer fresh DB values over the JWT payload — keeps role/status changes immediate.
