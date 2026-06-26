@@ -9,14 +9,15 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 // Pulse instead of resetting on every single mouse-move — avoids hammering setTimeout.
 const ACTIVITY_DEBOUNCE_MS = 30 * 1000 // 30 seconds
 
-const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
+const WINDOW_ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
   'mousemove',
   'mousedown',
   'keydown',
   'scroll',
   'touchstart',
-  'visibilitychange',
 ]
+// visibilitychange lives on Document, not Window — bound separately below.
+const DOCUMENT_ACTIVITY_EVENTS: Array<keyof DocumentEventMap> = ['visibilitychange']
 
 /**
  * Logs the user out after IDLE_TIMEOUT_MS of no activity. Activity = mouse/key/scroll/touch
@@ -62,11 +63,17 @@ export function useIdleLogout() {
     }
 
     arm()
-    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
+    WINDOW_ACTIVITY_EVENTS.forEach((e) =>
+      window.addEventListener(e, onActivity, { passive: true }),
+    )
+    DOCUMENT_ACTIVITY_EVENTS.forEach((e) =>
+      document.addEventListener(e, onActivity, { passive: true }),
+    )
 
     return () => {
       if (idleTimer.current) clearTimeout(idleTimer.current)
-      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, onActivity))
+      WINDOW_ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, onActivity))
+      DOCUMENT_ACTIVITY_EVENTS.forEach((e) => document.removeEventListener(e, onActivity))
     }
   }, [user, logout, router, pathname])
 }
