@@ -156,6 +156,13 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
       res.status(404).json({ error: 'User not found' })
       return
     }
+    // Re-issue the cookie with the current options (notably Domain from COOKIE_DOMAIN).
+    // This transparently UPGRADES legacy host-only cookies (set on api.xpunt24.com before
+    // COOKIE_DOMAIN existed) to .xpunt24.com on the next app load, so the frontend
+    // middleware on xpunt24.com starts seeing the cookie — no manual re-login needed.
+    // Also acts as a sliding session for active users.
+    const freshToken = issueToken(user._id.toString(), user.role, user.accountStatus)
+    res.cookie(AUTH_COOKIE_NAME, freshToken, authCookieOptions())
     res.json({ user })
   } catch (err) {
     next(err)
