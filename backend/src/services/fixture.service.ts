@@ -21,7 +21,15 @@ async function fetchFromApi(path: string): Promise<unknown[]> {
   if (!res.ok) {
     throw new AppError(`Football API error: ${res.status}`, 502, 'FOOTBALL_API_ERROR')
   }
-  const json = (await res.json()) as FixtureApiResponse
+  const json = (await res.json()) as FixtureApiResponse & { errors?: unknown }
+  // api-sports returns HTTP 200 even when rate-limited/erroring — the problem is in `errors`
+  // (an object/array of messages; `[]` on success). Throw so we never cache an empty/garbage
+  // result (which would blank out the fixtures board until the cache expired).
+  const errs = json.errors
+  const hasErr = Array.isArray(errs) ? errs.length > 0 : !!errs && Object.keys(errs).length > 0
+  if (hasErr) {
+    throw new AppError(`Football API error: ${JSON.stringify(errs)}`, 502, 'FOOTBALL_API_ERROR')
+  }
   return json.response
 }
 
@@ -36,6 +44,7 @@ function isFinished(status: string): boolean {
 class FixtureService {
   async getFixturesByDate(date: string, leagueId?: string): Promise<unknown[]> {
     const allCacheKey = `fixtures:date:${date}:all`
+    const lastGoodKey = `fixtures:date:${date}:lastgood`
 
     // Always work from the full-day cache
     let allFixtures: unknown[]
@@ -44,12 +53,33 @@ class FixtureService {
     if (cached) {
       allFixtures = JSON.parse(cached) as unknown[]
     } else {
-      allFixtures = await fetchFromApi(`/fixtures?date=${date}`)
-      const hasLive = (allFixtures as Array<{ fixture: { status: { short: string } } }>).some(
-        (f) => isLive(f?.fixture?.status?.short),
-      )
-      // 5-min TTL when live matches are on, 60-min otherwise
-      await redis.set(allCacheKey, JSON.stringify(allFixtures), 'EX', hasLive ? 300 : 3600)
+      try {
+        allFixtures = await fetchFromApi(`/fixtures?date=${date}`)
+        const hasLive = (allFixtures as Array<{ fixture: { status: { short: string } } }>).some(
+          (f) => isLive(f?.fixture?.status?.short),
+        )
+        // 10-min TTL when live matches are on, 60-min otherwise. The api-football budget is
+        // tiny (100/day), and this single /fixtures?date= response already carries every
+        // fixture's live status + scores — so warm the per-fixture cache from it and let
+        // getFixtureById/getLiveData/getCompletedFixture serve from cache (no extra calls).
+        const ttl = hasLive ? 600 : 3600
+        await redis.set(allCacheKey, JSON.stringify(allFixtures), 'EX', ttl)
+        const pipeline = redis.pipeline()
+        for (const f of allFixtures as Array<{ fixture?: { id?: number } }>) {
+          const fid = f?.fixture?.id
+          if (fid) pipeline.set(`fixtures:id:${fid}`, JSON.stringify(f), 'EX', ttl)
+        }
+        await pipeline.exec()
+        // Keep a 24h "last known good" copy to serve when the API is rate-limited/down.
+        await redis.set(lastGoodKey, JSON.stringify(allFixtures), 'EX', 86400)
+      } catch (err) {
+        // Rate-limited or API error: serve the last-known-good board instead of blanking it.
+        const lastGood = await redis.get(lastGoodKey)
+        if (!lastGood) throw err
+        allFixtures = JSON.parse(lastGood) as unknown[]
+        // Short negative-cache so we don't re-hit the (limited) API on every request.
+        await redis.set(allCacheKey, lastGood, 'EX', 120)
+      }
     }
 
     // League filter is done in-memory — no extra API call
@@ -89,25 +119,10 @@ class FixtureService {
     halftimeHome: number | null
     halftimeAway: number | null
   }> {
-    const cacheKey = `fixtures:live:${id}`
-    const cached = await redis.get(cacheKey)
-    if (cached)
-      return JSON.parse(cached) as {
-        playedTime: number
-        status: string
-        isLive: boolean
-        homeScore: number
-        awayScore: number
-        halftimeHome: number | null
-        halftimeAway: number | null
-      }
-
-    const data = await fetchFromApi(`/fixtures?id=${id}&live=all`)
-    const fixture = (
-      data.length
-        ? data[0]
-        : await this.getFixtureById(id)
-    ) as {
+    // Derive live data from the cached fixture object (warmed by getFixturesByDate's single
+    // /fixtures?date= call, which includes live status/elapsed/goals). No separate per-fixture
+    // live API call — that per-minute-per-fixture call was the main budget drain.
+    const fixture = (await this.getFixtureById(id)) as {
       fixture: { status: { short: string; elapsed: number } }
       goals: { home: number | null; away: number | null }
       score?: { halftime?: { home: number | null; away: number | null } }
@@ -124,7 +139,6 @@ class FixtureService {
       halftimeAway: fixture?.score?.halftime?.away ?? null,
     }
 
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 60)
     return result
   }
 
@@ -156,15 +170,22 @@ class FixtureService {
         status: string
       }
 
-    const data = await fetchFromApi(`/fixtures?id=${id}`)
-    if (!data.length) throw new AppError('Fixture not found', 404)
-
-    const fixture = data[0] as {
+    // Prefer the cached fixture (warmed from the daily /fixtures?date= fetch). Only spend a
+    // direct API call when the cached copy isn't finished yet — settlement needs the real
+    // final score, and we don't want to wait up to 10 min for the daily cache to refresh.
+    let fixture = (await this.getFixtureById(id)) as {
       fixture: { status: { short: string } }
       goals: { home: number | null; away: number | null }
       score?: { halftime?: { home: number | null; away: number | null } }
     }
-    const status = fixture?.fixture?.status?.short ?? ''
+    let status = fixture?.fixture?.status?.short ?? ''
+
+    if (!isFinished(status)) {
+      const data = await fetchFromApi(`/fixtures?id=${id}`)
+      if (!data.length) throw new AppError('Fixture not found', 404)
+      fixture = data[0] as typeof fixture
+      status = fixture?.fixture?.status?.short ?? ''
+    }
 
     if (!isFinished(status)) {
       throw new AppError(`Fixture is not finished (status: ${status})`, 400, 'FIXTURE_NOT_FINISHED')
