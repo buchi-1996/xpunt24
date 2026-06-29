@@ -489,22 +489,24 @@ class ChallengeService {
               secondary.creatorId.toString(), stakeNum, primary._id.toString(), session,
             )
 
+            // Activate the primary creator's wager.
             await Wager.updateMany({ challengeId: p._id }, { status: WagerStatus.ACTIVE }, { session })
-            await Wager.updateMany({ challengeId: s._id }, { status: WagerStatus.CANCELLED }, { session })
-            await Wager.create(
-              [
-                {
+            // Re-point the secondary creator's EXISTING wager onto the primary challenge
+            // instead of cancelling it and creating a new one. Otherwise the opposer ends up
+            // with two rows in their wagers page — a CANCELLED dupe plus the MATCHED one. Their
+            // pick already equals p.opponentPick (that's the matching criterion).
+            await Wager.updateMany(
+              { challengeId: s._id, userId: secondary.creatorId },
+              {
+                $set: {
                   challengeId: p._id,
-                  userId: secondary.creatorId,
                   pick: p.opponentPick,
                   market: p.market,
                   marketParam: p.marketParam,
-                  stake: p.stake,
-                  currency: p.currency,
                   potentialPayout: p.potentialWin,
                   status: WagerStatus.ACTIVE,
                 },
-              ],
+              },
               { session },
             )
           },

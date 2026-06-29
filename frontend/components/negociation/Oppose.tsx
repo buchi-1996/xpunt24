@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient'
 import { toast } from 'sonner'
 import LoaderSpinner from '../spinner'
 import { useWallet } from '@/context/wallet/WalletContect'
+import { findPickByTuple, pickCardLabel } from '@/lib/picks'
 
 interface OpposeProps {
     match: {
@@ -16,14 +17,20 @@ interface OpposeProps {
     }
     id: string
     amount: number
+    market?: string
+    marketParam?: string | null
     opposerPick?: string | null
 }
 
-const Oppose = ({ id, match, amount, opposerPick }: OpposeProps) => {
+const Oppose = ({ id, match, amount, market, marketParam, opposerPick }: OpposeProps) => {
     const { teams } = match
     const { home, away } = teams
     const { refresh: refreshWallet } = useWallet()
     const [isPending, startTransition] = useTransition()
+    // The opposer takes the opposite side. Resolve (market, marketParam, opposerPick) to its
+    // real label so e.g. DOUBLE_CHANCE+AWAY shows "X2" / "Away or Draw", not bare "away".
+    const opposerLabel = pickCardLabel(market, marketParam, opposerPick ?? undefined)
+    const opposerFull = findPickByTuple(market, marketParam, opposerPick ?? undefined)?.longLabel ?? opposerLabel
 
     const handleOppose = () => {
         startTransition(async () => {
@@ -49,8 +56,11 @@ const Oppose = ({ id, match, amount, opposerPick }: OpposeProps) => {
                         {away.name}
                     </span>
                 </div>
-                <span className="text-black font-bold py-1 px-2 capitalize ring-4 ring-red-500 rounded-full bg-red-300 text-xs">
-                    {opposerPick}
+                <span
+                    title={opposerFull}
+                    className="text-black font-bold py-1 px-2 text-center ring-4 ring-red-500 rounded-full bg-red-300 text-xs whitespace-nowrap"
+                >
+                    {opposerLabel}
                 </span>
             </div>
 
