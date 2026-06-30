@@ -84,6 +84,15 @@ class FixtureService {
         allFixtures = JSON.parse(lastGood) as unknown[]
         // Short negative-cache so we don't re-hit the (limited) API on every request.
         await redis.set(allCacheKey, lastGood, 'EX', 120)
+        // Warm the per-fixture cache from the last-good board too, so getFixtureById (and
+        // challenge creation, which validates the kickoff) work during the rate-limit window
+        // — otherwise those per-fixture reads would hit the maxed API and 502.
+        const pipeline = redis.pipeline()
+        for (const f of allFixtures as Array<{ fixture?: { id?: number } }>) {
+          const fid = f?.fixture?.id
+          if (fid) pipeline.set(`fixtures:id:${fid}`, JSON.stringify(f), 'EX', 120)
+        }
+        await pipeline.exec()
       }
     }
 
