@@ -50,32 +50,21 @@ class FixtureService {
     let allFixtures: unknown[]
     const cached = await redis.get(allCacheKey)
 
+    const hasLiveIn = (fixtures: unknown[]): boolean =>
+      (fixtures as Array<{ fixture?: { status?: { short?: string } } }>).some((f) =>
+        isLive(f?.fixture?.status?.short ?? ''),
+      )
+
     if (cached) {
       allFixtures = JSON.parse(cached) as unknown[]
     } else {
       try {
         allFixtures = await fetchFromApi(`/fixtures?date=${date}`)
-        const hasLive = (allFixtures as Array<{ fixture: { status: { short: string } } }>).some(
-          (f) => isLive(f?.fixture?.status?.short),
-        )
-        // 10-min TTL when live matches are on, 60-min otherwise. The api-football budget is
-        // tiny (100/day), and this single /fixtures?date= response already carries every
-        // fixture's live status + scores — so warm the per-fixture cache from it and let
-        // getFixtureById/getLiveData/getCompletedFixture serve from cache (no extra calls).
-        const ttl = hasLive ? env.FIXTURES_LIVE_TTL_SECONDS : env.FIXTURES_DATE_TTL_SECONDS
+        // 10-min TTL when live matches are on, 60-min otherwise (env-tunable). This single
+        // /fixtures?date= response carries every fixture's live status + scores.
+        const ttl = hasLiveIn(allFixtures) ? env.FIXTURES_LIVE_TTL_SECONDS : env.FIXTURES_DATE_TTL_SECONDS
         await redis.set(allCacheKey, JSON.stringify(allFixtures), 'EX', ttl)
-        const pipeline = redis.pipeline()
-        for (const f of allFixtures as Array<{ fixture?: { id?: number } }>) {
-          const fid = f?.fixture?.id
-          if (fid) {
-            pipeline.set(`fixtures:id:${fid}`, JSON.stringify(f), 'EX', ttl)
-            // 24h last-known-good per fixture, so getFixtureById (and challenge creation,
-            // which validates the kickoff) keeps working when the API is rate-limited.
-            pipeline.set(`fixtures:id:${fid}:lastgood`, JSON.stringify(f), 'EX', 86400)
-          }
-        }
-        await pipeline.exec()
-        // Keep a 24h "last known good" copy to serve when the API is rate-limited/down.
+        // Keep a 24h "last known good" board to serve when the API is rate-limited/down.
         await redis.set(lastGoodKey, JSON.stringify(allFixtures), 'EX', 86400)
       } catch (err) {
         // Rate-limited or API error: serve the last-known-good board instead of blanking it.
@@ -84,16 +73,27 @@ class FixtureService {
         allFixtures = JSON.parse(lastGood) as unknown[]
         // Short negative-cache so we don't re-hit the (limited) API on every request.
         await redis.set(allCacheKey, lastGood, 'EX', 120)
-        // Warm the per-fixture cache from the last-good board too, so getFixtureById (and
-        // challenge creation, which validates the kickoff) work during the rate-limit window
-        // — otherwise those per-fixture reads would hit the maxed API and 502.
-        const pipeline = redis.pipeline()
-        for (const f of allFixtures as Array<{ fixture?: { id?: number } }>) {
-          const fid = f?.fixture?.id
-          if (fid) pipeline.set(`fixtures:id:${fid}`, JSON.stringify(f), 'EX', 120)
-        }
-        await pipeline.exec()
       }
+    }
+
+    // ALWAYS warm the per-fixture cache from whatever board we're serving (cache hit, fresh,
+    // or last-good) — getFixtureById / getLiveData / challenge creation read these. Doing it
+    // on every call (not just a cache miss) keeps the match-detail page, live data and booking
+    // working even while api-football is rate-limited. The 24h :lastgood is the durable
+    // fallback getFixtureById uses when the short copy expires and the API is maxed.
+    {
+      const perIdTtl = hasLiveIn(allFixtures)
+        ? env.FIXTURES_LIVE_TTL_SECONDS
+        : env.FIXTURES_DATE_TTL_SECONDS
+      const pipeline = redis.pipeline()
+      for (const f of allFixtures as Array<{ fixture?: { id?: number } }>) {
+        const fid = f?.fixture?.id
+        if (fid) {
+          pipeline.set(`fixtures:id:${fid}`, JSON.stringify(f), 'EX', perIdTtl)
+          pipeline.set(`fixtures:id:${fid}:lastgood`, JSON.stringify(f), 'EX', 86400)
+        }
+      }
+      await pipeline.exec()
     }
 
     // League filter is done in-memory — no extra API call
