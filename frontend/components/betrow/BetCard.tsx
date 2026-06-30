@@ -128,7 +128,7 @@ const BetCard = ({ _id, matchData, amount, market, marketParam, challenger, chal
       <Button
         onClick={() =>
           requireAuth(
-            () => openModal(<Oppose id={_id} match={matchData} amount={amount} opposerPick={opposerPick} />),
+            () => openModal(<Oppose id={_id} match={matchData} amount={amount} market={market} marketParam={marketParam} opposerPick={opposerPick} />),
             'Log in to oppose this challenge',
           )
         }
