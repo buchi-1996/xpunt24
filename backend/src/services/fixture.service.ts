@@ -67,7 +67,12 @@ class FixtureService {
         const pipeline = redis.pipeline()
         for (const f of allFixtures as Array<{ fixture?: { id?: number } }>) {
           const fid = f?.fixture?.id
-          if (fid) pipeline.set(`fixtures:id:${fid}`, JSON.stringify(f), 'EX', ttl)
+          if (fid) {
+            pipeline.set(`fixtures:id:${fid}`, JSON.stringify(f), 'EX', ttl)
+            // 24h last-known-good per fixture, so getFixtureById (and challenge creation,
+            // which validates the kickoff) keeps working when the API is rate-limited.
+            pipeline.set(`fixtures:id:${fid}:lastgood`, JSON.stringify(f), 'EX', 86400)
+          }
         }
         await pipeline.exec()
         // Keep a 24h "last known good" copy to serve when the API is rate-limited/down.
@@ -98,14 +103,22 @@ class FixtureService {
     const cached = await redis.get(cacheKey)
     if (cached) return JSON.parse(cached)
 
-    const data = await fetchFromApi(`/fixtures?id=${id}`)
-    if (!data.length) throw new AppError('Fixture not found', 404)
+    try {
+      const data = await fetchFromApi(`/fixtures?id=${id}`)
+      if (!data.length) throw new AppError('Fixture not found', 404)
 
-    const fixture = data[0] as { fixture: { status: { short: string } } }
-    const ttl = isLive(fixture?.fixture?.status?.short) ? 300 : 3600
-    await redis.set(cacheKey, JSON.stringify(fixture), 'EX', ttl)
-
-    return fixture
+      const fixture = data[0] as { fixture: { status: { short: string } } }
+      const ttl = isLive(fixture?.fixture?.status?.short) ? 300 : 3600
+      await redis.set(cacheKey, JSON.stringify(fixture), 'EX', ttl)
+      await redis.set(`${cacheKey}:lastgood`, JSON.stringify(fixture), 'EX', 86400)
+      return fixture
+    } catch (err) {
+      // Rate-limited / API down: fall back to the 24h last-known-good copy so reads (and
+      // challenge creation, which only needs the fixed kickoff time) keep working.
+      const lastGood = await redis.get(`${cacheKey}:lastgood`)
+      if (lastGood) return JSON.parse(lastGood)
+      throw err
+    }
   }
 
   async getLiveData(

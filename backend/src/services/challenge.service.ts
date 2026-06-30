@@ -126,6 +126,11 @@ class ChallengeService {
         'FIXTURE_KICKOFF_UNKNOWN',
       )
     }
+    // Kickoff-time guard: the fixture status above can be stale (we serve a cached/last-good
+    // fixture when api-football is rate-limited), so also reject by the fixed kickoff time.
+    if (kickoffMs <= Date.now()) {
+      throw new AppError('Fixture has already started', 400, 'FIXTURE_STARTED')
+    }
     const kickoffDate = new Date(kickoffMs)
 
     // expiresAt = min(provided, kickoff). Always set — never null.
