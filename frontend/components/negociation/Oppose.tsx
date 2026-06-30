@@ -5,6 +5,7 @@ import { api } from '@/lib/apiClient'
 import { toast } from 'sonner'
 import LoaderSpinner from '../spinner'
 import { useWallet } from '@/context/wallet/WalletContect'
+import { useModal } from '@/hooks/useModal'
 import { findPickByTuple, pickCardLabel } from '@/lib/picks'
 
 interface OpposeProps {
@@ -26,6 +27,7 @@ const Oppose = ({ id, match, amount, market, marketParam, opposerPick }: OpposeP
     const { teams } = match
     const { home, away } = teams
     const { refresh: refreshWallet } = useWallet()
+    const { closeModal } = useModal()
     const [isPending, startTransition] = useTransition()
     // The opposer takes the opposite side. Resolve (market, marketParam, opposerPick) to its
     // real label so e.g. DOUBLE_CHANCE+AWAY shows "X2" / "Away or Draw", not bare "away".
@@ -37,6 +39,7 @@ const Oppose = ({ id, match, amount, market, marketParam, opposerPick }: OpposeP
             try {
                 await api.challenges.accept(id)
                 toast.success('Challenge accepted!', { id: 'oppose-success' })
+                closeModal()
                 await refreshWallet()
             } catch (err: unknown) {
                 const error = err as { message?: string }
