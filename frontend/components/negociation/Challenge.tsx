@@ -61,6 +61,9 @@ const Challenge = ({ match, selectedOption }: ChallengeProps) => {
         toast.success('Challenge created successfully', { id: 'challenge-success' })
         setIsOpen(false)
         setInput('')
+        // Tell the lobby / Featured carousel to re-fetch so the new challenge appears
+        // immediately without a manual refresh.
+        window.dispatchEvent(new Event('challenges:refresh'))
         await refreshWallet()
       } catch (err: unknown) {
         const error = err as { status?: number; message?: string }

@@ -30,6 +30,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const socket = io(apiUrl, { withCredentials: true })
     socketRef.current = socket
 
+    socket.on(SocketEvent.CHALLENGE_CREATED, () => {
+      window.dispatchEvent(new Event('challenges:refresh'))
+    })
+
     socket.on(SocketEvent.CHALLENGE_MATCHED, () => {
       // trigger challenge list refresh via custom event
       window.dispatchEvent(new Event('challenges:refresh'))

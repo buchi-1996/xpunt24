@@ -40,6 +40,8 @@ const Oppose = ({ id, match, amount, market, marketParam, opposerPick }: OpposeP
                 await api.challenges.accept(id)
                 toast.success('Challenge accepted!', { id: 'oppose-success' })
                 closeModal()
+                // The challenge is no longer OPEN — refresh the lobby/Featured immediately.
+                window.dispatchEvent(new Event('challenges:refresh'))
                 await refreshWallet()
             } catch (err: unknown) {
                 const error = err as { message?: string }

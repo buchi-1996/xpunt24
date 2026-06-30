@@ -50,12 +50,19 @@ const ChallengeSlides = () => {
   const [challenges, setChallenges] = useState<ChallengeProps[]>([])
 
   useEffect(() => {
-    api.challenges.list({ status: 'OPEN' })
-      .then((res) => {
-        const valid = (res.data as ChallengeProps[]).filter(hasValidMatchData)
-        setChallenges(valid)
-      })
-      .catch((err) => console.error('Error fetching challenges:', err))
+    const load = () => {
+      api.challenges.list({ status: 'OPEN' })
+        .then((res) => {
+          const valid = (res.data as ChallengeProps[]).filter(hasValidMatchData)
+          setChallenges(valid)
+        })
+        .catch((err) => console.error('Error fetching challenges:', err))
+    }
+    load()
+    // Re-fetch when a challenge is created/matched/cancelled/settled (dispatched by the
+    // create flow and the socket layer) so Featured updates without a manual refresh.
+    window.addEventListener('challenges:refresh', load)
+    return () => window.removeEventListener('challenges:refresh', load)
   }, [])
 
   return (
