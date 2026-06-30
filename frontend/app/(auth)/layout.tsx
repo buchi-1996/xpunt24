@@ -23,8 +23,11 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 // });
 
 export const metadata: Metadata = {
-  title: "Register",
-  description: "Create an Xpunt24 account",
+  title: {
+    template: '%s | Xpunt24',
+    default: 'Xpunt24',
+  },
+  description: 'Sign in or create your Xpunt24 account to start placing peer-to-peer sports challenges.',
 };
 
 export default function AuthLayout({

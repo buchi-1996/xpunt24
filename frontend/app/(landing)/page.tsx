@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 
+export const metadata: Metadata = {
+  title: 'Xpunt24 — Peer-to-Peer Sports Challenges',
+  description: 'Browse live matches, place challenges, and compete head-to-head with other sports fans on Xpunt24.',
+}
 
 import BetRow from "@/components/betrow"
 import SkeletonLoader from "@/components/betrow/SkeletonLoader"

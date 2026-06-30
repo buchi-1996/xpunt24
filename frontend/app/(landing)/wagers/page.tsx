@@ -1,3 +1,10 @@
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My Wagers',
+  description: 'Track and manage all your active, open, and settled peer-to-peer sports challenges on Xpunt24.',
+}
+
 import { BetListWrapper } from '@/components/betlist'
 import LeagueTabs from '@/components/leagueTabs'
 import { Suspense } from 'react'

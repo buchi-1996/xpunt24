@@ -1,3 +1,10 @@
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Matches',
+  description: 'Browse upcoming and live football matches and place peer-to-peer challenges on Xpunt24.',
+}
+
 import BetRow from '@/components/betrow'
 import SkeletonLoader from '@/components/betrow/SkeletonLoader'
 import LeagueTabs from '@/components/leagueTabs'
