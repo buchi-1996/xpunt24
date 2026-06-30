@@ -19,6 +19,10 @@ export interface IChallengeDocument extends Document {
   expiresAt?: Date
   settledAt?: Date
   winnerUserId?: Types.ObjectId
+  // Set when the auto-matcher merged this (newer) challenge into an older primary one: the
+  // creator's stake + wager moved to `mergedInto`, this row is CANCELLED and hidden from the
+  // user's list (they participate via the primary challenge instead).
+  mergedInto?: Types.ObjectId
   createdAt: Date
   updatedAt: Date
 }
@@ -49,6 +53,7 @@ const challengeSchema = new Schema<IChallengeDocument>(
     expiresAt: { type: Date },
     settledAt: { type: Date },
     winnerUserId: { type: Schema.Types.ObjectId, ref: 'User' },
+    mergedInto: { type: Schema.Types.ObjectId, ref: 'Challenge' },
   },
   { timestamps: true },
 )

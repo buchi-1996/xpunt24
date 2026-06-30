@@ -345,6 +345,10 @@ class ChallengeService {
         { creatorId: new Types.ObjectId(userId) },
         { opponentId: new Types.ObjectId(userId) },
       ],
+      // Hide secondary challenges that the auto-matcher merged into a primary — the user
+      // already appears on the primary (matched), so showing the cancelled secondary too
+      // would duplicate the entry in their wagers list.
+      mergedInto: { $exists: false },
     }
     if (filters['status']) query['status'] = filters['status']
 
@@ -475,7 +479,7 @@ class ChallengeService {
             if (!p) throw new AppError('Primary no longer open', 409, 'NOT_OPEN')
             const s = await Challenge.findOneAndUpdate(
               { _id: secondary._id, status: ChallengeStatus.OPEN },
-              { status: ChallengeStatus.CANCELLED },
+              { status: ChallengeStatus.CANCELLED, mergedInto: primary._id },
               { session, new: true },
             )
             if (!s) throw new AppError('Secondary no longer open', 409, 'NOT_OPEN')
