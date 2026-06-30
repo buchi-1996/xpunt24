@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import FormCard from '../formcard'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,8 @@ const ResetPasswordFormInner = () => {
   const { refresh } = useAuth()
 
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   // No token in the URL = wrong path. Redirect to forgot-password so they can request one.
   useEffect(() => {
@@ -60,25 +62,45 @@ const ResetPasswordFormInner = () => {
     >
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 w-full">
         <div>
-          <Input
-            type="password"
-            placeholder="New password (min 10 characters)"
-            autoComplete="new-password"
-            className="py-6 rounded-lg shadow-none"
-            {...form.register('password')}
-          />
+          <div className="relative">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="New password (min 10 characters)"
+              autoComplete="new-password"
+              className="py-6 rounded-lg shadow-none pr-10"
+              {...form.register('password')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           {form.formState.errors.password && (
             <p className="text-xs text-red-500 mt-1 pl-1">{form.formState.errors.password.message}</p>
           )}
         </div>
         <div>
-          <Input
-            type="password"
-            placeholder="Confirm new password"
-            autoComplete="new-password"
-            className="py-6 rounded-lg shadow-none"
-            {...form.register('confirmPassword')}
-          />
+          <div className="relative">
+            <Input
+              type={showConfirm ? 'text' : 'password'}
+              placeholder="Confirm new password"
+              autoComplete="new-password"
+              className="py-6 rounded-lg shadow-none pr-10"
+              {...form.register('confirmPassword')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           {form.formState.errors.confirmPassword && (
             <p className="text-xs text-red-500 mt-1 pl-1">{form.formState.errors.confirmPassword.message}</p>
           )}

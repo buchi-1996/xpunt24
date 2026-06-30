@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import FormCard from '../formcard'
 import GoogleSignBtn from '../GoogleSignBtn'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import { RegisterValues, registerSchema } from '@/lib/formSchema'
 const RegisterForm = () => {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -78,13 +79,23 @@ const RegisterForm = () => {
           )}
         </div>
         <div>
-          <Input
-            type="password"
-            placeholder="Password (min 10 characters)"
-            autoComplete="new-password"
-            className="py-6 rounded-lg shadow-none"
-            {...form.register('password')}
-          />
+          <div className="relative">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password (min 10 characters)"
+              autoComplete="new-password"
+              className="py-6 rounded-lg shadow-none pr-10"
+              {...form.register('password')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           {form.formState.errors.password && (
             <p className="text-xs text-red-500 mt-1 pl-1">{form.formState.errors.password.message}</p>
           )}
