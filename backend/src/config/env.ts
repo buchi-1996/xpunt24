@@ -14,6 +14,11 @@ const envSchema = z.object({
   MIN_WITHDRAWAL: z.coerce.number(),
   WITHDRAWAL_REVIEW_THRESHOLD: z.coerce.number(),
   FOOTBALL_API_KEY: z.string().min(1),
+  // Fixture cache TTLs (seconds). Tight defaults conserve the api-football quota (100/day);
+  // lower them (e.g. 60/120) after upgrading the plan for fresher live scores. Live data and
+  // per-fixture lookups derive from the daily board cache, so these govern live freshness too.
+  FIXTURES_LIVE_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+  FIXTURES_DATE_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
   CRON_SECRET: z.string().min(1),
   REDIS_URL: z.string().min(1),
   PAYRAM_API_URL: z.string().url().default('http://localhost:7000'),

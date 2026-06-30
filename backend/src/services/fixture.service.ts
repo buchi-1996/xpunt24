@@ -62,7 +62,7 @@ class FixtureService {
         // tiny (100/day), and this single /fixtures?date= response already carries every
         // fixture's live status + scores — so warm the per-fixture cache from it and let
         // getFixtureById/getLiveData/getCompletedFixture serve from cache (no extra calls).
-        const ttl = hasLive ? 600 : 3600
+        const ttl = hasLive ? env.FIXTURES_LIVE_TTL_SECONDS : env.FIXTURES_DATE_TTL_SECONDS
         await redis.set(allCacheKey, JSON.stringify(allFixtures), 'EX', ttl)
         const pipeline = redis.pipeline()
         for (const f of allFixtures as Array<{ fixture?: { id?: number } }>) {
@@ -117,7 +117,9 @@ class FixtureService {
       if (!data.length) throw new AppError('Fixture not found', 404)
 
       const fixture = data[0] as { fixture: { status: { short: string } } }
-      const ttl = isLive(fixture?.fixture?.status?.short) ? 300 : 3600
+      const ttl = isLive(fixture?.fixture?.status?.short)
+        ? env.FIXTURES_LIVE_TTL_SECONDS
+        : env.FIXTURES_DATE_TTL_SECONDS
       await redis.set(cacheKey, JSON.stringify(fixture), 'EX', ttl)
       await redis.set(`${cacheKey}:lastgood`, JSON.stringify(fixture), 'EX', 86400)
       return fixture
