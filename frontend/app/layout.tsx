@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${plusJakartaSans.className} ${plusJakartaSans.variable}`}>
-      <body className="overflow-x-hidden antialiased bg-[#F1F3FF]">
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${plusJakartaSans.className} ${plusJakartaSans.variable} overflow-x-hidden antialiased bg-[#F1F3FF]`}>
         {children}
       </body>
     </html>
